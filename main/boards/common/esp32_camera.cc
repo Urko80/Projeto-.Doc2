@@ -327,10 +327,6 @@ std::expected<std::string, std::string> Esp32Camera::Explain(const std::string& 
     std::lock_guard<std::mutex> capture_lock(capture_mutex_);
     // DOC FIM — Exclusão mútua durante a análise da imagem.
 
-    if (explain_url_.empty()) {
-        return std::unexpected("Image explain URL or token is not set");
-    }
-
     if (current_fb_ == nullptr) {
         return std::unexpected("No camera frame captured");
     }
@@ -348,6 +344,11 @@ std::expected<std::string, std::string> Esp32Camera::Explain(const std::string& 
     }
 #endif
     // DOC FIM — Priorizar Gemini quando a chave estiver configurada.
+
+    // DOC — Só exige o endpoint remoto quando a chave Gemini não foi configurada.
+    if (explain_url_.empty()) {
+        return std::unexpected("Configure a chave Gemini ou o endpoint de visão XiaoZhi");
+    }
 
     // Create local JPEG queue
     QueueHandle_t jpeg_queue = xQueueCreate(40, sizeof(JpegChunk));
