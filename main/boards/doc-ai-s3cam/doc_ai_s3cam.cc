@@ -8,6 +8,8 @@
 #include "boards/common/esp32_camera.h"
 
 #include <driver/spi_master.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
@@ -60,6 +62,44 @@ private:
         ESP_LOGI(TAG, "Camera OV3660 configured: XCLK=%d Hz", XCLK_FREQ_HZ);
     }
     // DOC FIM — Inicialização da câmera OV3660.
+
+    // DOC INÍCIO — Tarefa de prévia contínua.
+    // Captura periodicamente quadros e entrega-os ao display existente.
+    // Não realiza análise de imagem nesta tarefa; a análise será acionada por voz.
+    static void CameraPreviewTask(void* arg) {
+        auto* board = static_cast<DocAiS3Cam*>(arg);
+        constexpr uint32_t CAMERA_PREVIEW_INTERVAL_MS = 250;
+
+        while (true) {
+            if (board->camera_ != nullptr) {
+                board->camera_->Capture();
+            }
+            vTaskDelay(pdMS_TO_TICKS(CAMERA_PREVIEW_INTERVAL_MS));
+        }
+    }
+
+    void StartCameraPreviewTask() {
+        if (camera_ == nullptr) {
+            ESP_LOGE(TAG, "Camera preview task not started: camera is unavailable");
+            return;
+        }
+
+        // DOC — Pilha e prioridade conservadoras; ajustar após medir no hardware.
+        BaseType_t result = xTaskCreate(
+            CameraPreviewTask,
+            "doc_cam_preview",
+            4096,
+            this,
+            2,
+            nullptr);
+
+        if (result != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create camera preview task");
+        } else {
+            ESP_LOGI(TAG, "Continuous camera preview task started");
+        }
+    }
+    // DOC FIM — Tarefa de prévia contínua.
 
 
     void InitializeButtons() {
@@ -138,6 +178,7 @@ public:
         InitializeButtons();
         InitializeDisplay();
         InitializeCamera();
+        StartCameraPreviewTask();
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
