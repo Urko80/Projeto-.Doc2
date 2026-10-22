@@ -3,7 +3,8 @@
 #include "gif/lvgl_gif.h"
 #include "lvgl_theme.h"
 #include "settings.h"
-
+// DOC — Interface do módulo de olhos animados. alterado adicionado
+#include "custom_eyes.h"
 #include <esp_err.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
@@ -321,7 +322,18 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
     }
 }
 
+
+
+// DOC — Destrutor: libera os recursos da interface e dos olhos animados.
 LcdDisplay::~LcdDisplay() {
+
+    // DOC — Encerra os olhos antes de destruir os objetos da interface.
+    if (custom_eyes_initialized_) {
+        CustomEyes_Deinit();
+        custom_eyes_initialized_ = false;
+    }
+
+    // DOC — Limpa a imagem de pré-visualização existente.
     SetPreviewImage(nullptr);
 
     // Clean up GIF controller
@@ -928,11 +940,30 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(emoji_image_);
     lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
 
+
+// DOC — Etapa 1: ocultar a carinha original no centro. alterado adicionado
+lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+
     /* Middle layer: preview_image_ - centered display */
     preview_image_ = lv_image_create(screen);
     lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
     lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
+
+
+
+
+// DOC — Inicializa os olhos animados personalizados.
+// O módulo usa a tela principal como objeto pai do LVGL.
+if (!custom_eyes_initialized_) {
+    CustomEyes_Init(screen);
+    custom_eyes_initialized_ = true;
+}
+
+
+
+
+
 
     /* Layer 1: Top bar - for status icons */
     top_bar_ = lv_obj_create(screen);
@@ -1176,10 +1207,36 @@ void LcdDisplay::ClearChatMessages() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
+    // DOC — Encaminha a expressão ao módulo de olhos animados.
+    // A lógica original de emojis e GIFs continua abaixo, sem substituição.
+    if (custom_eyes_initialized_ && emotion != nullptr) {
+        CustomEyes_SetExpression(emotion);
+    }
+
     if (!setup_ui_called_) {
         ESP_LOGW(TAG, "SetEmotion('%s') called before SetupUI() - emotion will not be displayed!",
                  emotion);
     }
+
+
+// DOC — Traduz estados explícitos da aplicação para o módulo de olhos.
+// Emoções comuns, como happy, sad e neutral, continuam no fluxo original.
+if (custom_eyes_initialized_ && emotion != nullptr) {
+    if (strcmp(emotion, "listening") == 0) {
+        CustomEyes_SetState(EYES_STATE_LISTENING);
+    } else if (strcmp(emotion, "speaking") == 0 ||
+               strcmp(emotion, "talking") == 0) {
+        CustomEyes_SetState(EYES_STATE_SPEAKING);
+    } else if (strcmp(emotion, "thinking") == 0) {
+        CustomEyes_SetState(EYES_STATE_THINKING);
+    } else if (strcmp(emotion, "idle") == 0) {
+        CustomEyes_SetState(EYES_STATE_IDLE);
+    }
+}
+
+
+
+
     if (emoji_image_ == nullptr) {
         if (setup_ui_called_) {
             ESP_LOGW(TAG,

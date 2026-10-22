@@ -1,0 +1,10 @@
+{
+    "type": "doc-ai-s3cam",
+    "target": "esp32s3",
+    "builds": [
+        {
+            "name": "doc-ai-s3cam",
+            "sdkconfig_append": []
+        }
+    ]
+}

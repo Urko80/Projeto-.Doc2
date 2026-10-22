@@ -1,4 +1,4 @@
-# Define source files
+﻿# Define source files
 set(SOURCES "audio/audio_codec.cc"
             "audio/audio_debugger.cc"
             "audio/audio_service.cc"
@@ -19,6 +19,8 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lcd_display.cc"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
+"display/lcd_display.cc"
+"display/custom_eyes.c"
             "display/emote_display.cc"
             "display/lvgl_display/emoji_collection.cc"
             "display/lvgl_display/lvgl_theme.cc"
@@ -185,6 +187,10 @@ elseif(CONFIG_BOARD_TYPE_RYMCU_BIGSMART)
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)
     set(BUILTIN_ICON_FONT font_material_symbols_20_4)
     set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_128)
+elseif(CONFIG_BOARD_TYPE_DOC_AI_S3CAM)
+    set(BOARD_DIR "doc-ai-s3cam")
+    set(BUILTIN_TEXT_FONT font_noto_sans_basic_14_1)
+    set(BUILTIN_ICON_FONT font_material_symbols_14_1)
 elseif(CONFIG_BOARD_TYPE_EDA_TV_PRO)
     set(BOARD_DIR "lceda-course-examples/eda-tv-pro")
 elseif(CONFIG_BOARD_TYPE_EDA_ROBOT_PRO)
@@ -1257,7 +1263,7 @@ endif()
 
 if(CONFIG_BOARD_TYPE_ESP_HI)
 # Pin AAF assets to a fixed image_player commit so builds stay reproducible.
-# Only pack AAF files referenced by emoji_display.cc — the full test_8bit set
+# Only pack AAF files referenced by emoji_display.cc â€” the full test_8bit set
 # plus wakenet models overflows the 1MB assets partition on the 4MB ESP-HI
 # flash map (see #2228).
 set(URL "https://github.com/espressif2022/image_player/raw/d61e0ccb1d7b0a2a214d0c90f5451fd683f41682/test_apps/test_8bit")
@@ -1501,3 +1507,4 @@ if ("${size}" AND "${offset}")
 else()
     message(STATUS "Assets partition not found, using v1 partition table")
 endif()
+

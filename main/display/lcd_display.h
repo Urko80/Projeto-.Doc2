@@ -33,6 +33,17 @@ protected:
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
 
+
+
+
+// DOC — Controle da inicialização dos olhos animados. alterado adicionado
+// Evita inicializar duas vezes o módulo de olhos na mesma instância.
+bool custom_eyes_initialized_ = false;
+
+
+
+
+
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;

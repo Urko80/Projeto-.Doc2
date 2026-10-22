@@ -1,0 +1,468 @@
+﻿
+/*
+ * DOC — Olhos animados para display LVGL.
+ * Arquivo: main/display/custom_eyes.c
+ *
+ * Recursos:
+ * - Dois olhos com íris, pupila e brilho.
+ * - Pálpebras animadas.
+ * - Estados idle, listening, speaking e thinking.
+ * - Piscadas automáticas e sob solicitação.
+ *
+ * IMPORTANTE:
+ * - O módulo deve ser inicializado e encerrado pela tarefa que controla
+ *   a interface LVGL, respeitando o mecanismo de bloqueio do projeto.
+ */
+
+#include "custom_eyes.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#define DOC_SCREEN_W             128
+#define DOC_SCREEN_H             160
+
+#define DOC_EYE_SIZE             36
+#define DOC_IRIS_SIZE            18
+#define DOC_PUPIL_SIZE           8
+#define DOC_HIGHLIGHT_SIZE       4
+
+#define DOC_EYE_CENTER_Y         76
+#define DOC_EYE_CENTER_LEFT_X    38
+#define DOC_EYE_CENTER_RIGHT_X   90
+
+#define DOC_TIMER_MS             33
+#define DOC_BLINK_MIN_MS          1800
+#define DOC_BLINK_MAX_MS          4800
+
+#define DOC_COLOR_BACKGROUND     0x0D0D0D
+#define DOC_COLOR_SCLERA         0xFFFFFF
+#define DOC_COLOR_IRIS           0x3A7CA5
+#define DOC_COLOR_PUPIL          0x111111
+#define DOC_COLOR_HIGHLIGHT      0xFFFFFF
+
+#define DOC_BLINK_SPEED          0.20f
+#define DOC_LOOK_SPEED           0.09f
+#define DOC_OPEN_SPEED           0.12f
+
+typedef struct {
+    lv_obj_t *sclera;
+    lv_obj_t *iris;
+    lv_obj_t *pupil;
+    lv_obj_t *highlight;
+    lv_obj_t *lid;
+
+    int center_x;
+    int center_y;
+} doc_eye_t;
+
+/* DOC — Estado interno do módulo. */
+static doc_eye_t left_eye;
+static doc_eye_t right_eye;
+
+static lv_obj_t *eyes_parent = NULL;
+static lv_timer_t *eyes_timer = NULL;
+
+static eyes_state_t current_state = EYES_STATE_IDLE;
+
+static float eye_open = 0.95f;
+static float target_open = 0.95f;
+
+static float look_x = 0.0f;
+static float look_y = 0.0f;
+static float target_look_x = 0.0f;
+static float target_look_y = 0.0f;
+
+static float blink_amount = 0.0f;
+static bool blink_closing = false;
+static bool blink_active = false;
+
+static uint32_t next_blink_tick = 0;
+static bool eyes_initialized = false;
+
+/* DOC — Retorna true quando o prazo já foi atingido,
+ * inclusive quando o contador de ticks sofre overflow.
+ */
+static bool doc_tick_reached(uint32_t now, uint32_t deadline)
+{
+    return (int32_t)(now - deadline) >= 0;
+}
+
+/* DOC — Limita um valor a um intervalo. */
+static float doc_clampf(float value, float min_value, float max_value)
+{
+    if (value < min_value) {
+        return min_value;
+    }
+
+    if (value > max_value) {
+        return max_value;
+    }
+
+    return value;
+}
+
+/* DOC — Aproxima suavemente um valor do seu destino. */
+static float doc_approach(float current, float target, float speed)
+{
+    return current + (target - current) * speed;
+}
+
+/* DOC — Cria um círculo LVGL com cor e dimensões definidas. */
+static lv_obj_t *doc_create_circle(
+    lv_obj_t *parent,
+    int size,
+    uint32_t color)
+{
+    lv_obj_t *obj = lv_obj_create(parent);
+
+    lv_obj_remove_style_all(obj);
+    lv_obj_set_size(obj, size, size);
+    lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+
+    return obj;
+}
+
+/* DOC — Cria os componentes visuais de um olho. */
+static bool doc_create_eye(doc_eye_t *eye, int center_x, int center_y)
+{
+    if (eye == NULL || eyes_parent == NULL) {
+        return false;
+    }
+
+    eye->center_x = center_x;
+    eye->center_y = center_y;
+
+    eye->sclera = doc_create_circle(
+        eyes_parent, DOC_EYE_SIZE, DOC_COLOR_SCLERA);
+
+    eye->iris = doc_create_circle(
+        eyes_parent, DOC_IRIS_SIZE, DOC_COLOR_IRIS);
+
+    eye->pupil = doc_create_circle(
+        eyes_parent, DOC_PUPIL_SIZE, DOC_COLOR_PUPIL);
+
+    eye->highlight = doc_create_circle(
+        eyes_parent, DOC_HIGHLIGHT_SIZE, DOC_COLOR_HIGHLIGHT);
+
+    /* DOC — A pálpebra cobre o olho usando a cor de fundo do display. */
+    eye->lid = lv_obj_create(eyes_parent);
+
+    lv_obj_remove_style_all(eye->lid);
+    lv_obj_set_size(eye->lid, DOC_EYE_SIZE, 1);
+    lv_obj_set_style_radius(eye->lid, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(
+        eye->lid, lv_color_hex(DOC_COLOR_BACKGROUND), 0);
+    lv_obj_set_style_bg_opa(eye->lid, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(eye->lid, 0, 0);
+    lv_obj_set_style_pad_all(eye->lid, 0, 0);
+    lv_obj_clear_flag(eye->lid, LV_OBJ_FLAG_SCROLLABLE);
+
+    return true;
+}
+
+/* DOC — Posiciona a íris, a pupila e o brilho. */
+static void doc_position_eye(doc_eye_t *eye)
+{
+    if (eye == NULL || eye->sclera == NULL) {
+        return;
+    }
+
+    int sclera_x = eye->center_x - DOC_EYE_SIZE / 2;
+    int sclera_y = eye->center_y - DOC_EYE_SIZE / 2;
+
+    lv_obj_set_pos(eye->sclera, sclera_x, sclera_y);
+
+    int iris_x = eye->center_x - DOC_IRIS_SIZE / 2 + (int)look_x;
+    int iris_y = eye->center_y - DOC_IRIS_SIZE / 2 + (int)look_y;
+
+    /* DOC — Mantém a íris dentro dos limites aproximados da esclera. */
+    iris_x = (int)doc_clampf(
+        (float)iris_x,
+        (float)(sclera_x + 2),
+        (float)(sclera_x + DOC_EYE_SIZE - DOC_IRIS_SIZE - 2));
+
+    iris_y = (int)doc_clampf(
+        (float)iris_y,
+        (float)(sclera_y + 2),
+        (float)(sclera_y + DOC_EYE_SIZE - DOC_IRIS_SIZE - 2));
+
+    lv_obj_set_pos(eye->iris, iris_x, iris_y);
+
+    int pupil_x = iris_x + (DOC_IRIS_SIZE - DOC_PUPIL_SIZE) / 2;
+    int pupil_y = iris_y + (DOC_IRIS_SIZE - DOC_PUPIL_SIZE) / 2;
+
+    lv_obj_set_pos(eye->pupil, pupil_x, pupil_y);
+
+    lv_obj_set_pos(
+        eye->highlight,
+        pupil_x + 1,
+        pupil_y + 1);
+}
+
+/* DOC — Atualiza a abertura da pálpebra. */
+static void doc_update_lid(doc_eye_t *eye)
+{
+    if (eye == NULL || eye->lid == NULL) {
+        return;
+    }
+
+    float closed_amount = doc_clampf(blink_amount, 0.0f, 1.0f);
+
+    float effective_open = eye_open * (1.0f - closed_amount);
+    effective_open = doc_clampf(effective_open, 0.0f, 1.0f);
+
+    int lid_height = (int)((1.0f - effective_open) * DOC_EYE_SIZE);
+
+    if (lid_height < 1) {
+        lid_height = 1;
+    }
+
+    if (lid_height > DOC_EYE_SIZE) {
+        lid_height = DOC_EYE_SIZE;
+    }
+
+    lv_obj_set_size(eye->lid, DOC_EYE_SIZE, lid_height);
+
+    lv_obj_set_pos(
+        eye->lid,
+        eye->center_x - DOC_EYE_SIZE / 2,
+        eye->center_y - DOC_EYE_SIZE / 2);
+
+    /* DOC — Esconde a pálpebra quando o olho está suficientemente aberto. */
+    if (effective_open >= 0.98f) {
+        lv_obj_add_flag(eye->lid, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_remove_flag(eye->lid, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+/* DOC — Agenda a próxima piscada automática. */
+static void doc_schedule_blink(uint32_t now)
+{
+    uint32_t interval =
+        DOC_BLINK_MIN_MS +
+        (now % (DOC_BLINK_MAX_MS - DOC_BLINK_MIN_MS + 1));
+
+    next_blink_tick = now + interval;
+}
+
+/* DOC — Inicia uma piscada, se não houver outra em andamento. */
+static void doc_start_blink(void)
+{
+    if (blink_active) {
+        return;
+    }
+
+    blink_active = true;
+    blink_closing = true;
+    blink_amount = 0.0f;
+}
+
+/* DOC — Define o movimento e a abertura desejados para cada estado. */
+static void doc_apply_state(eyes_state_t state)
+{
+    switch (state) {
+        case EYES_STATE_LISTENING:
+            target_open = 1.0f;
+            target_look_x = 0.0f;
+            target_look_y = -2.0f;
+            break;
+
+        case EYES_STATE_SPEAKING:
+            target_open = 0.88f;
+            target_look_x = 0.0f;
+            target_look_y = 0.0f;
+            break;
+
+        case EYES_STATE_THINKING:
+            target_open = 0.65f;
+            target_look_x = 4.0f;
+            target_look_y = -3.0f;
+            break;
+
+        case EYES_STATE_IDLE:
+        default:
+            target_open = 0.95f;
+            target_look_x = 0.0f;
+            target_look_y = 0.0f;
+            break;
+    }
+}
+
+/* DOC — Temporizador principal da animação. */
+static void doc_animation_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+
+    if (!eyes_initialized || eyes_parent == NULL) {
+        return;
+    }
+
+    uint32_t now = lv_tick_get();
+
+    /* DOC — Piscadas automáticas. */
+    if (!blink_active && doc_tick_reached(now, next_blink_tick)) {
+        doc_start_blink();
+    }
+
+    if (blink_active) {
+        if (blink_closing) {
+            blink_amount += DOC_BLINK_SPEED;
+
+            if (blink_amount >= 1.0f) {
+                blink_amount = 1.0f;
+                blink_closing = false;
+            }
+        } else {
+            blink_amount -= DOC_BLINK_SPEED;
+
+            if (blink_amount <= 0.0f) {
+                blink_amount = 0.0f;
+                blink_active = false;
+                doc_schedule_blink(now);
+            }
+        }
+    }
+
+    /* DOC — Movimentos suaves dos olhos. */
+    eye_open = doc_approach(eye_open, target_open, DOC_OPEN_SPEED);
+    look_x = doc_approach(look_x, target_look_x, DOC_LOOK_SPEED);
+    look_y = doc_approach(look_y, target_look_y, DOC_LOOK_SPEED);
+
+    doc_position_eye(&left_eye);
+    doc_position_eye(&right_eye);
+
+    doc_update_lid(&left_eye);
+    doc_update_lid(&right_eye);
+}
+
+/* DOC — Inicialização pública do módulo. */
+void CustomEyes_Init(lv_obj_t *parent)
+{
+    if (parent == NULL || eyes_initialized) {
+        return;
+    }
+
+    eyes_parent = parent;
+
+    if (!doc_create_eye(
+            &left_eye, DOC_EYE_CENTER_LEFT_X, DOC_EYE_CENTER_Y) ||
+        !doc_create_eye(
+            &right_eye, DOC_EYE_CENTER_RIGHT_X, DOC_EYE_CENTER_Y)) {
+        CustomEyes_Deinit();
+        return;
+    }
+
+    current_state = EYES_STATE_IDLE;
+    eye_open = 0.95f;
+    target_open = 0.95f;
+
+    look_x = 0.0f;
+    look_y = 0.0f;
+
+    target_look_x = 0.0f;
+    target_look_y = 0.0f;
+
+    blink_amount = 0.0f;
+    blink_active = false;
+    blink_closing = false;
+
+    eyes_initialized = true;
+
+    doc_apply_state(current_state);
+    doc_position_eye(&left_eye);
+    doc_position_eye(&right_eye);
+    doc_update_lid(&left_eye);
+    doc_update_lid(&right_eye);
+
+    uint32_t now = lv_tick_get();
+    next_blink_tick = now + 2000;
+
+    eyes_timer = lv_timer_create(
+        doc_animation_timer_cb, DOC_TIMER_MS, NULL);
+
+    if (eyes_timer == NULL) {
+        CustomEyes_Deinit();
+    }
+}
+
+/* DOC — Troca o estado de animação. */
+void CustomEyes_SetState(eyes_state_t state)
+{
+    if (!eyes_initialized || state < EYES_STATE_IDLE ||
+        state >= EYES_STATE_COUNT) {
+        return;
+    }
+
+    current_state = state;
+    doc_apply_state(current_state);
+}
+
+/* DOC — Solicita uma piscada imediata. */
+void CustomEyes_BlinkNow(void)
+{
+    if (eyes_initialized) {
+        doc_start_blink();
+    }
+}
+
+/* DOC — Encerra a animação e remove os objetos criados pelo módulo.
+ * Os objetos são removidos individualmente porque o pai pertence
+ * à interface principal do display.
+ */
+void CustomEyes_Deinit(void)
+{
+    if (eyes_timer != NULL) {
+        lv_timer_delete(eyes_timer);
+        eyes_timer = NULL;
+    }
+
+    if (left_eye.sclera != NULL) {
+        lv_obj_delete(left_eye.sclera);
+    }
+    if (left_eye.iris != NULL) {
+        lv_obj_delete(left_eye.iris);
+    }
+    if (left_eye.pupil != NULL) {
+        lv_obj_delete(left_eye.pupil);
+    }
+    if (left_eye.highlight != NULL) {
+        lv_obj_delete(left_eye.highlight);
+    }
+    if (left_eye.lid != NULL) {
+        lv_obj_delete(left_eye.lid);
+    }
+
+    if (right_eye.sclera != NULL) {
+        lv_obj_delete(right_eye.sclera);
+    }
+    if (right_eye.iris != NULL) {
+        lv_obj_delete(right_eye.iris);
+    }
+    if (right_eye.pupil != NULL) {
+        lv_obj_delete(right_eye.pupil);
+    }
+    if (right_eye.highlight != NULL) {
+        lv_obj_delete(right_eye.highlight);
+    }
+    if (right_eye.lid != NULL) {
+        lv_obj_delete(right_eye.lid);
+    }
+
+    /* DOC — Limpa os ponteiros para permitir uma inicialização futura. */
+    left_eye = (doc_eye_t){0};
+    right_eye = (doc_eye_t){0};
+
+    eyes_parent = NULL;
+    eyes_initialized = false;
+
+    blink_active = false;
+    blink_closing = false;
+    blink_amount = 0.0f;
+}
