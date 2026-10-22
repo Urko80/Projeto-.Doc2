@@ -1146,6 +1146,7 @@ idf_component_register(SRCS ${SOURCES}
                         esp_app_format
                         app_update
                         spi_flash
+                        esp_http_client
                         mbedtls
                         console
                         efuse
