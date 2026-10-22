@@ -1128,22 +1128,36 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
         return;
     }
 
+    // DOC INÍCIO — Atualização da prévia persistente da câmera.
+    // Reutiliza preview_image_ em todos os quadros; não cria objetos LVGL por frame.
+    // O cache mantém o descritor e o buffer da imagem válidos enquanto a tela o utiliza.
     preview_image_cached_ = std::move(image);
     auto img_dsc = preview_image_cached_->image_dsc();
     lv_image_set_src(preview_image_, img_dsc);
+
+    // DOC — Reserva a faixa inferior para a câmera e mantém os olhos na parte superior.
+    // Ajuste CAMERA_PREVIEW_MAX_WIDTH/HEIGHT caso queira alterar o tamanho da prévia.
+    constexpr lv_coord_t CAMERA_PREVIEW_MAX_WIDTH = 120;
+    constexpr lv_coord_t CAMERA_PREVIEW_MAX_HEIGHT = 64;
     if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
-        // zoom factor 0.5
-        lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        lv_coord_t zoom_w = (CAMERA_PREVIEW_MAX_WIDTH * 256) / img_dsc->header.w;
+        lv_coord_t zoom_h = (CAMERA_PREVIEW_MAX_HEIGHT * 256) / img_dsc->header.h;
+        lv_coord_t zoom = zoom_w < zoom_h ? zoom_w : zoom_h;
+        lv_image_set_scale(preview_image_, zoom);
     }
 
-    // Hide emoji_box_
-    if (gif_controller_) {
-        gif_controller_->Stop();
-    }
-    lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+    // DOC — Alinha a imagem abaixo da área dos olhos sem cobrir o topo da tela.
+    lv_obj_align(preview_image_, LV_ALIGN_BOTTOM_MID, 0, -18);
+
+    // A prévia da câmera é contínua; não interromper a animação dos olhos.
     lv_obj_remove_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
-    esp_timer_stop(preview_timer_);
-    ESP_ERROR_CHECK(esp_timer_start_once(preview_timer_, PREVIEW_IMAGE_DURATION_MS * 1000));
+    // Reiniciar o temporizador a cada quadro evita que a prévia suma durante a captura.
+    if (preview_timer_ != nullptr) {
+        esp_timer_stop(preview_timer_);
+        ESP_ERROR_CHECK(esp_timer_start_once(
+            preview_timer_, PREVIEW_IMAGE_DURATION_MS * 1000));
+    }
+    // DOC FIM — Atualização da prévia persistente da câmera.
 }
 
 void LcdDisplay::SetChatMessage(const char* role, const char* content) {
