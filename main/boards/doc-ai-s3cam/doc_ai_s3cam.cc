@@ -5,6 +5,10 @@
 #include "button.h"
 #include "config.h"
 #include "display/lcd_display.h"
+#include "esp32_camera.h"
+#include <esp_camera.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>
@@ -19,6 +23,8 @@ class DocAiS3Cam : public WifiBoard {
 private:
     Button boot_button_;
     Display* display_ = nullptr;
+    // DOC — Instância da câmera; permanece viva durante toda a execução da placa.
+    Camera* camera_ = nullptr;
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
@@ -30,6 +36,62 @@ private:
             app.ToggleChatState();
         });
     }
+
+    // DOC INÍCIO — Prévia contínua da câmera.
+    // Atualiza a imagem da tela em intervalos regulares. O intervalo pode ser
+    // alterado aqui; valores menores aumentam a fluidez e o uso de CPU/memória.
+    static void CameraPreviewTask(void* parameter) {
+        auto* camera = static_cast<Camera*>(parameter);
+        while (true) {
+            if (camera == nullptr || !camera->Capture()) {
+                vTaskDelay(pdMS_TO_TICKS(500));
+                continue;
+            }
+            // SetPreviewImage reinicia o temporizador da prévia; atualizações
+            // contínuas impedem que a imagem desapareça enquanto a câmera roda.
+            vTaskDelay(pdMS_TO_TICKS(250));
+        }
+    }
+
+    void InitializeCamera() {
+        // DOC — Pinagem da OV3660 definida em config.h para facilitar alterações.
+        camera_config_t camera_config = {};
+        camera_config.pin_pwdn = CAMERA_PIN_PWDN;
+        camera_config.pin_reset = CAMERA_PIN_RESET;
+        camera_config.pin_xclk = CAMERA_PIN_XCLK;
+        camera_config.pin_sccb_sda = CAMERA_PIN_SIOD;
+        camera_config.pin_sccb_scl = CAMERA_PIN_SIOC;
+        camera_config.pin_d0 = CAMERA_PIN_D0;
+        camera_config.pin_d1 = CAMERA_PIN_D1;
+        camera_config.pin_d2 = CAMERA_PIN_D2;
+        camera_config.pin_d3 = CAMERA_PIN_D3;
+        camera_config.pin_d4 = CAMERA_PIN_D4;
+        camera_config.pin_d5 = CAMERA_PIN_D5;
+        camera_config.pin_d6 = CAMERA_PIN_D6;
+        camera_config.pin_d7 = CAMERA_PIN_D7;
+        camera_config.pin_vsync = CAMERA_PIN_VSYNC;
+        camera_config.pin_href = CAMERA_PIN_HREF;
+        camera_config.pin_pclk = CAMERA_PIN_PCLK;
+        camera_config.xclk_freq_hz = XCLK_FREQ_HZ;
+        camera_config.ledc_timer = LEDC_TIMER_0;
+        camera_config.ledc_channel = LEDC_CHANNEL_0;
+        // RGB565 permite mostrar a prévia no LVGL sem decodificar JPEG.
+        camera_config.pixel_format = PIXFORMAT_RGB565;
+        camera_config.frame_size = FRAMESIZE_QQVGA; // 160x120: adequado à tela 128x160.
+        camera_config.fb_count = 2;
+        camera_config.fb_location = CAMERA_FB_IN_PSRAM;
+        camera_config.grab_mode = CAMERA_GRAB_LATEST;
+
+        camera_ = new Esp32Camera(camera_config);
+        BaseType_t task_ok = xTaskCreate(
+            CameraPreviewTask, "doc_cam_preview", 4096, camera_, 3, nullptr);
+        if (task_ok != pdPASS) {
+            ESP_LOGE(TAG, "Could not start camera preview task");
+        } else {
+            ESP_LOGI(TAG, "Camera preview task started (XCLK=%d Hz)", XCLK_FREQ_HZ);
+        }
+    }
+    // DOC FIM — Prévia contínua da câmera.
 
     void InitializeDisplay() {
         spi_bus_config_t bus_config = {};
@@ -95,6 +157,8 @@ public:
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
+        // DOC — Inicializar a câmera depois do display para que a prévia tenha destino.
+        InitializeCamera();
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
@@ -119,6 +183,11 @@ public:
 
     Display* GetDisplay() override {
         return display_;
+    }
+
+    // DOC — Expõe a câmera ao MCP e ao acionamento por comando de voz.
+    Camera* GetCamera() override {
+        return camera_;
     }
 };
 
