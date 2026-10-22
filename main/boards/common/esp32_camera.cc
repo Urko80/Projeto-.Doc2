@@ -81,9 +81,17 @@ static std::expected<std::string, std::string> ExplainFrameWithGemini(
 
     // DOC — Monta o pedido Gemini com uma instrução curta e a imagem capturada.
     cJSON* root = cJSON_CreateObject();
+    if (root == nullptr) {
+        return std::unexpected("Memória insuficiente para montar o pedido Gemini");
+    }
     cJSON* contents = cJSON_AddArrayToObject(root, "contents");
     cJSON* content_item = cJSON_CreateObject();
     cJSON* parts = cJSON_AddArrayToObject(content_item, "parts");
+    if (contents == nullptr || content_item == nullptr || parts == nullptr) {
+        cJSON_Delete(root);
+        cJSON_Delete(content_item);
+        return std::unexpected("Falha ao montar os campos do pedido Gemini");
+    }
     cJSON* text_part = cJSON_CreateObject();
     cJSON_AddStringToObject(text_part, "text", question.c_str());
     cJSON_AddItemToArray(parts, text_part);
@@ -141,10 +149,14 @@ static std::expected<std::string, std::string> ExplainFrameWithGemini(
     }
     cJSON* candidates = cJSON_GetObjectItem(response_json, "candidates");
     cJSON* first_candidate = cJSON_IsArray(candidates) ? cJSON_GetArrayItem(candidates, 0) : nullptr;
-    cJSON* response_content = cJSON_GetObjectItem(first_candidate, "content");
-    cJSON* response_parts = cJSON_GetObjectItem(response_content, "parts");
-    cJSON* first_part = cJSON_IsArray(response_parts) ? cJSON_GetArrayItem(response_parts, 0) : nullptr;
-    cJSON* response_text = cJSON_GetObjectItem(first_part, "text");
+    cJSON* response_content = first_candidate != nullptr
+        ? cJSON_GetObjectItem(first_candidate, "content") : nullptr;
+    cJSON* response_parts = response_content != nullptr
+        ? cJSON_GetObjectItem(response_content, "parts") : nullptr;
+    cJSON* first_part = cJSON_IsArray(response_parts)
+        ? cJSON_GetArrayItem(response_parts, 0) : nullptr;
+    cJSON* response_text = first_part != nullptr
+        ? cJSON_GetObjectItem(first_part, "text") : nullptr;
 
     std::string answer;
     if (cJSON_IsString(response_text) && response_text->valuestring != nullptr) {
