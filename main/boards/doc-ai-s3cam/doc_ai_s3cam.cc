@@ -5,8 +5,11 @@
 #include "button.h"
 #include "config.h"
 #include "display/lcd_display.h"
+#include "boards/common/esp32_camera.h"
 
 #include <driver/spi_master.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
@@ -19,6 +22,85 @@ class DocAiS3Cam : public WifiBoard {
 private:
     Button boot_button_;
     Display* display_ = nullptr;
+
+    // DOC INÍCIO — Instância da câmera OV3660.
+    // A classe comum do firmware administra a captura e os quadros da câmera.
+    Camera* camera_ = nullptr;
+    // DOC FIM — Instância da câmera OV3660.
+
+    // DOC INÍCIO — Inicialização da câmera OV3660.
+    // Configura a pinagem da placa e usa RGB565 para permitir prévia no display.
+    void InitializeCamera() {
+        camera_config_t camera_config = {};
+        camera_config.ledc_channel = LEDC_CHANNEL_0;
+        camera_config.ledc_timer = LEDC_TIMER_0;
+        camera_config.pin_d0 = CAMERA_PIN_D0;
+        camera_config.pin_d1 = CAMERA_PIN_D1;
+        camera_config.pin_d2 = CAMERA_PIN_D2;
+        camera_config.pin_d3 = CAMERA_PIN_D3;
+        camera_config.pin_d4 = CAMERA_PIN_D4;
+        camera_config.pin_d5 = CAMERA_PIN_D5;
+        camera_config.pin_d6 = CAMERA_PIN_D6;
+        camera_config.pin_d7 = CAMERA_PIN_D7;
+        camera_config.pin_xclk = CAMERA_PIN_XCLK;
+        camera_config.pin_pclk = CAMERA_PIN_PCLK;
+        camera_config.pin_vsync = CAMERA_PIN_VSYNC;
+        camera_config.pin_href = CAMERA_PIN_HREF;
+        camera_config.pin_sccb_sda = CAMERA_PIN_SIOD;
+        camera_config.pin_sccb_scl = CAMERA_PIN_SIOC;
+        camera_config.pin_pwdn = CAMERA_PIN_PWDN;
+        camera_config.pin_reset = CAMERA_PIN_RESET;
+        camera_config.xclk_freq_hz = XCLK_FREQ_HZ;
+        camera_config.pixel_format = PIXFORMAT_RGB565;
+        camera_config.frame_size = FRAMESIZE_QQVGA;
+        camera_config.jpeg_quality = 12;
+        camera_config.fb_count = 2;
+        camera_config.fb_location = CAMERA_FB_IN_PSRAM;
+        camera_config.grab_mode = CAMERA_GRAB_LATEST;
+
+        camera_ = new Esp32Camera(camera_config);
+        ESP_LOGI(TAG, "Camera OV3660 configured: XCLK=%d Hz", XCLK_FREQ_HZ);
+    }
+    // DOC FIM — Inicialização da câmera OV3660.
+
+    // DOC INÍCIO — Tarefa de prévia contínua.
+    // Captura periodicamente quadros e entrega-os ao display existente.
+    // Não realiza análise de imagem nesta tarefa; a análise será acionada por voz.
+    static void CameraPreviewTask(void* arg) {
+        auto* board = static_cast<DocAiS3Cam*>(arg);
+        constexpr uint32_t CAMERA_PREVIEW_INTERVAL_MS = 250;
+
+        while (true) {
+            if (board->camera_ != nullptr) {
+                board->camera_->Capture();
+            }
+            vTaskDelay(pdMS_TO_TICKS(CAMERA_PREVIEW_INTERVAL_MS));
+        }
+    }
+
+    void StartCameraPreviewTask() {
+        if (camera_ == nullptr) {
+            ESP_LOGE(TAG, "Camera preview task not started: camera is unavailable");
+            return;
+        }
+
+        // DOC — Pilha e prioridade conservadoras; ajustar após medir no hardware.
+        BaseType_t result = xTaskCreate(
+            CameraPreviewTask,
+            "doc_cam_preview",
+            4096,
+            this,
+            2,
+            nullptr);
+
+        if (result != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create camera preview task");
+        } else {
+            ESP_LOGI(TAG, "Continuous camera preview task started");
+        }
+    }
+    // DOC FIM — Tarefa de prévia contínua.
+
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
@@ -95,6 +177,8 @@ public:
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
+        InitializeCamera();
+        StartCameraPreviewTask();
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
@@ -120,6 +204,12 @@ public:
     Display* GetDisplay() override {
         return display_;
     }
+
+    // DOC INÍCIO — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
+    Camera* GetCamera() override {
+        return camera_;
+    }
+    // DOC FIM — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
 };
 
 DECLARE_BOARD(DocAiS3Cam);

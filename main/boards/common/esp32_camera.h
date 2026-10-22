@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <memory>
 #include <thread>
+#include <mutex>  // DOC: sincroniza a captura contínua com a análise sob demanda.
 #include <vector>
 
 #include <freertos/FreeRTOS.h>
@@ -20,6 +21,12 @@ struct JpegChunk {
 
 class Esp32Camera : public Camera {
 private:
+    // DOC INÍCIO — Proteção contra captura e análise simultâneas.
+    // A prévia roda em tarefa própria e o MCP pode solicitar uma foto ao mesmo tempo.
+    // O mutex mantém current_fb_ e os buffers estáveis durante Capture() e Explain().
+    std::mutex capture_mutex_;
+    // DOC FIM — Proteção contra captura e análise simultâneas.
+
     bool streaming_on_ = false;
     bool swap_bytes_enabled_ = true;  // Swap pixel byte order for RGB565, enabled by default
     std::string explain_url_;

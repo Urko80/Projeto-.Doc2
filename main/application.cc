@@ -17,10 +17,93 @@
 #include <arpa/inet.h>
 #include <cJSON.h>
 #include <algorithm>
+#include <atomic>
+#include <cctype>
 #include <cstring>
 #include <limits>
+#include <new>
 
 #define TAG "Application"
+
+// DOC INÍCIO — Detecção local do comando de visão e tarefa de análise.
+// O texto reconhecido é normalizado para aceitar pontuação e variações de caixa.
+static std::atomic<bool> g_doc_vision_task_running{false};
+
+static std::string NormalizeDocVisionCommand(const std::string& input) {
+    std::string normalized;
+    normalized.reserve(input.size());
+
+    for (unsigned char ch : input) {
+        if (ch == ',' || ch == '?' || ch == '!' || ch == '.' ||
+            ch == ';' || ch == ':' || ch == 39 || ch == '"') {
+            normalized.push_back(' ');
+        } else {
+            normalized.push_back(static_cast<char>(std::tolower(ch)));
+        }
+    }
+
+    // DOC — Converte É maiúsculo em é minúsculo sem alterar os demais bytes UTF-8.
+    const std::string upper_e_acute = "\xC3\x89";
+    const std::string lower_e_acute = "\xC3\xA9";
+    size_t pos = 0;
+    while ((pos = normalized.find(upper_e_acute, pos)) != std::string::npos) {
+        normalized.replace(pos, upper_e_acute.size(), lower_e_acute);
+        pos += lower_e_acute.size();
+    }
+
+    // DOC — Reduz espaços repetidos e remove espaços nas extremidades.
+    std::string compact;
+    bool previous_space = true;
+    for (unsigned char ch : normalized) {
+        if (std::isspace(ch)) {
+            if (!previous_space) compact.push_back(' ');
+            previous_space = true;
+        } else {
+            compact.push_back(static_cast<char>(ch));
+            previous_space = false;
+        }
+    }
+    if (!compact.empty() && compact.back() == ' ') compact.pop_back();
+    return compact;
+}
+
+static bool IsDocVisionCommand(const std::string& text) {
+    const std::string normalized = NormalizeDocVisionCommand(text);
+    return normalized == "doc o que é isso" ||
+           normalized == "doc o que e isso";
+}
+
+struct DocVisionTaskContext {
+    Application* app;
+    Camera* camera;
+    Display* display;
+};
+
+static void DocVisionAnalysisTask(void* argument) {
+    std::unique_ptr<DocVisionTaskContext> context(
+        static_cast<DocVisionTaskContext*>(argument));
+
+    std::string result;
+    if (context->camera == nullptr) {
+        result = "Câmera DOC indisponível.";
+    } else if (!context->camera->Capture()) {
+        result = "Não consegui capturar uma imagem da câmera.";
+    } else {
+        auto explanation = context->camera->Explain(
+            "Qual é o objeto principal em uma palavra? Descreva-o em uma linha.");
+        result = explanation ? *explanation : explanation.error();
+    }
+
+    // DOC — Atualiza a tela na tarefa principal para respeitar a thread de LVGL.
+    context->app->Schedule([display = context->display,
+                            message = std::move(result)]() {
+        display->SetChatMessage("system", message.c_str());
+    });
+
+    g_doc_vision_task_running.store(false);
+    vTaskDelete(nullptr);
+}
+// DOC FIM — Detecção local do comando de visão e tarefa de análise.
 
 Application::Application() : notify_player_(audio_service_) {
     event_group_ = xEventGroupCreate();
@@ -679,6 +762,45 @@ void Application::InitializeProtocol() {
                     display->AddTextGlyphs(glyphs, bpp);
                     display->SetChatMessage("user", message.c_str());
                 });
+
+                // DOC INÍCIO — Acionar análise somente para o comando de visão.
+                // A captura contínua continua funcionando, mas não chama Gemini por quadro.
+                if (IsDocVisionCommand(text->valuestring)) {
+                    bool expected_idle = false;
+                    if (g_doc_vision_task_running.compare_exchange_strong(expected_idle, true)) {
+                        auto camera = Board::GetInstance().GetCamera();
+                        auto* task_context = new (std::nothrow) DocVisionTaskContext{
+                            this, camera, display
+                        };
+                        if (task_context != nullptr) {
+                            Schedule([display]() {
+                                display->SetChatMessage("system", "Analisando a imagem...");
+                            });
+                            BaseType_t task_created = xTaskCreate(
+                                DocVisionAnalysisTask,
+                                "doc_vision",
+                                8192,
+                                task_context,
+                                2,
+                                nullptr);
+                            if (task_created != pdPASS) {
+                                delete task_context;
+                                g_doc_vision_task_running.store(false);
+                                Schedule([display]() {
+                                    display->SetChatMessage(
+                                        "system", "Não foi possível iniciar a análise da câmera.");
+                                });
+                            }
+                        } else {
+                            g_doc_vision_task_running.store(false);
+                            Schedule([display]() {
+                                display->SetChatMessage(
+                                    "system", "Memória insuficiente para analisar a imagem.");
+                            });
+                        }
+                    }
+                }
+                // DOC FIM — Acionar análise somente para o comando de visão.
             }
         } else if (strcmp(type->valuestring, "llm") == 0) {
             auto emotion = cJSON_GetObjectItem(root, "emotion");
