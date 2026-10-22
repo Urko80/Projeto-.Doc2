@@ -44,7 +44,11 @@ static const char *TAG = "CustomEyes";
 #define EYE_DISTANCE                52
 
 /* DOC — Valor negativo sobe os olhos; positivo desce os olhos. */
+// DOC INÍCIO — Ajuste vertical para reservar a parte inferior à câmera.
+// O centro usa 1/5 da altura da tela; o offset mantém o ajuste fino.
+// Altere EYE_CENTER_Y_OFFSET se precisar subir/descer as expressões.
 #define EYE_CENTER_Y_OFFSET         (-10)
+// DOC FIM — Ajuste vertical para reservar a parte inferior à câmera.
 
 /* DOC — Dimensões iniciais dos olhos, em pixels. */
 #define EYE_WIDTH_BASE              36
@@ -567,7 +571,10 @@ static void anim_timer_cb(lv_timer_t *timer)
         lerp(right_eye.offset_y, right_eye.target_offset_y, SHAPE_SPEED);
 
     /* DOC — Calcula os centros para a tela vertical 128x160. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    // DOC INÍCIO — Posicionamento dos olhos na faixa superior.
+// A mesma fórmula é usada na animação e na inicialização para evitar saltos.
+int center_y = (SCREEN_H / 5) + EYE_CENTER_Y_OFFSET;
+// DOC FIM — Posicionamento dos olhos na faixa superior.
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
@@ -612,7 +619,10 @@ void CustomEyes_Init(lv_obj_t *parent)
     apply_expression_targets();
 
     /* DOC — Posiciona os olhos antes do primeiro ciclo do timer. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    // DOC INÍCIO — Posicionamento dos olhos na faixa superior.
+// A mesma fórmula é usada na animação e na inicialização para evitar saltos.
+int center_y = (SCREEN_H / 5) + EYE_CENTER_Y_OFFSET;
+// DOC FIM — Posicionamento dos olhos na faixa superior.
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
