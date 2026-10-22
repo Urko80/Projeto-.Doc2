@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <cctype>
+#include <thread>
 
 #define TAG "Application"
 
@@ -674,10 +676,64 @@ void Application::InitializeProtocol() {
                     glyphs.clear();
                 }
                 ESP_LOGI(TAG, ">> %s", text->valuestring);
+
+                // DOC — Detecta o pedido explícito de visão a partir da transcrição.
+                // Aceita "Doc, o que é isso?" mesmo sem pontuação ou sem acento em "é".
+                // A análise não roda a cada frame: só começa após este comando de voz.
+                std::string normalized_text(text->valuestring);
+                std::transform(normalized_text.begin(), normalized_text.end(),
+                               normalized_text.begin(),
+                               [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                // DOC — Converte também o É maiúsculo em UTF-8 para evitar falha no gatilho.
+                auto replace_text = [](std::string& value, const std::string& from,
+                                       const std::string& to) {
+                    size_t position = 0;
+                    while ((position = value.find(from, position)) != std::string::npos) {
+                        value.replace(position, from.length(), to);
+                        position += to.length();
+                    }
+                };
+                replace_text(normalized_text, "\xC3\x89", "\xC3\xA9");
+                const bool asks_about_camera =
+                    normalized_text.find("doc") != std::string::npos &&
+                    (normalized_text.find("o que é isso") != std::string::npos ||
+                     normalized_text.find("o que e isso") != std::string::npos);
+
                 Schedule([display, message = std::string(text->valuestring),
-                          glyphs = std::move(glyphs), bpp]() {
+                          glyphs = std::move(glyphs), bpp, asks_about_camera]() {
                     display->AddTextGlyphs(glyphs, bpp);
                     display->SetChatMessage("user", message.c_str());
+
+                    if (!asks_about_camera) {
+                        return;
+                    }
+
+                    // DOC — A análise roda em uma thread separada para não bloquear áudio/UI.
+                    Camera* camera = Board::GetInstance().GetCamera();
+                    if (camera == nullptr) {
+                        display->SetChatMessage("assistant", "Câmera não disponível.");
+                        return;
+                    }
+
+                    std::thread([display, camera]() {
+                        if (!camera->Capture()) {
+                            display->SetChatMessage("assistant", "Não consegui capturar a imagem.");
+                            return;
+                        }
+
+                        auto explanation = camera->Explain(
+                            "Identifique o que aparece na imagem e descreva em uma frase curta, em português.");
+                        if (!explanation) {
+                            ESP_LOGW(TAG, "Camera explanation failed: %s",
+                                     explanation.error().c_str());
+                            display->SetChatMessage(
+                                "assistant",
+                                "A análise visual não está configurada ou falhou. Verifique o serviço de visão.");
+                            return;
+                        }
+
+                        display->SetChatMessage("assistant", explanation->c_str());
+                    }).detach();
                 });
             }
         } else if (strcmp(type->valuestring, "llm") == 0) {

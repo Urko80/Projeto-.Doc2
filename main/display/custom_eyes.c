@@ -43,8 +43,11 @@ static const char *TAG = "CustomEyes";
 /* DOC — Distância horizontal entre os centros dos olhos. */
 #define EYE_DISTANCE                52
 
-/* DOC — Valor negativo sobe os olhos; positivo desce os olhos. */
-#define EYE_CENTER_Y_OFFSET         (-10)
+/* DOC — Valor negativo sobe os olhos; positivo desce os olhos.
+ * DOC — Para a tela dividida, -50 coloca os centros dos olhos perto de y=30 px
+ * (aprox. 19% da altura de 160 px), deixando a maior parte inferior livre para a câmera.
+ */
+#define EYE_CENTER_Y_OFFSET         (-50)
 
 /* DOC — Dimensões iniciais dos olhos, em pixels. */
 #define EYE_WIDTH_BASE              36

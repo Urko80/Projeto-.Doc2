@@ -3,6 +3,7 @@
 
 #include <lvgl.h>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -20,6 +21,8 @@ struct JpegChunk {
 
 class Esp32Camera : public Camera {
 private:
+    // DOC — Protege o framebuffer compartilhado entre a prévia e a análise de imagem.
+    std::mutex camera_mutex_;
     bool streaming_on_ = false;
     bool swap_bytes_enabled_ = true;  // Swap pixel byte order for RGB565, enabled by default
     std::string explain_url_;

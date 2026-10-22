@@ -74,6 +74,8 @@ void Esp32Camera::SetExplainUrl(const std::string& url, const std::string& token
 }
 
 bool Esp32Camera::Capture() {
+    // DOC — Não permite que a prévia substitua o frame durante Explain().
+    std::lock_guard<std::mutex> camera_lock(camera_mutex_);
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -175,6 +177,8 @@ bool Esp32Camera::SetSwapBytes(bool enabled) {
 }
 
 std::expected<std::string, std::string> Esp32Camera::Explain(const std::string& question) {
+    // DOC — Mantém o frame estável enquanto ele é convertido e enviado ao serviço de visão.
+    std::lock_guard<std::mutex> camera_lock(camera_mutex_);
     if (explain_url_.empty()) {
         return std::unexpected("Image explain URL or token is not set");
     }
