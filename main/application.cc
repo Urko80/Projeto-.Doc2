@@ -684,6 +684,16 @@ void Application::InitializeProtocol() {
                 std::transform(normalized_text.begin(), normalized_text.end(),
                                normalized_text.begin(),
                                [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                // DOC — Converte também o É maiúsculo em UTF-8 para evitar falha no gatilho.
+                auto replace_text = [](std::string& value, const std::string& from,
+                                       const std::string& to) {
+                    size_t position = 0;
+                    while ((position = value.find(from, position)) != std::string::npos) {
+                        value.replace(position, from.length(), to);
+                        position += to.length();
+                    }
+                };
+                replace_text(normalized_text, "\xC3\x89", "\xC3\xA9");
                 const bool asks_about_camera =
                     normalized_text.find("doc") != std::string::npos &&
                     (normalized_text.find("o que é isso") != std::string::npos ||
