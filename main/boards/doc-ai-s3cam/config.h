@@ -47,7 +47,8 @@
 #define DISPLAY_SPI_MODE       0
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 
-// OV3660 camera wiring. Defined for the next integration milestone.
+// DOC INÍCIO — Pinagem da câmera OV3660.
+// Estes pinos correspondem à ligação física informada para a placa ESP32-S3 Cam.
 #define CAMERA_PIN_XCLK  GPIO_NUM_15
 #define CAMERA_PIN_SIOD  GPIO_NUM_4
 #define CAMERA_PIN_SIOC  GPIO_NUM_5
@@ -64,7 +65,9 @@
 #define CAMERA_PIN_PCLK  GPIO_NUM_13
 #define CAMERA_PIN_PWDN  GPIO_NUM_NC
 #define CAMERA_PIN_RESET GPIO_NUM_NC
-#define XCLK_FREQ_HZ     20000000
+#define XCLK_FREQ_HZ     12000000 // DOC: manter XCLK em 12 MHz para a OV3660.
+
+// DOC FIM — Pinagem da câmera OV3660.
 
 // PCA9685 pins are intentionally not assigned here because the user's confirmed
 // pin list does not yet specify the driver's SDA/SCL wiring.
