@@ -21,6 +21,7 @@
 #include <cctype>
 #include <cstring>
 #include <limits>
+#include <new>
 
 #define TAG "Application"
 
@@ -34,7 +35,7 @@ static std::string NormalizeDocVisionCommand(const std::string& input) {
 
     for (unsigned char ch : input) {
         if (ch == ',' || ch == '?' || ch == '!' || ch == '.' ||
-            ch == ';' || ch == ':' || ch == '\\'' || ch == '"') {
+            ch == ';' || ch == ':' || ch == 39 || ch == '"') {
             normalized.push_back(' ');
         } else {
             normalized.push_back(static_cast<char>(std::tolower(ch)));
@@ -42,8 +43,8 @@ static std::string NormalizeDocVisionCommand(const std::string& input) {
     }
 
     // DOC — Converte É maiúsculo em é minúsculo sem alterar os demais bytes UTF-8.
-    const std::string upper_e_acute = "\\xC3\\x89";
-    const std::string lower_e_acute = "\\xC3\\xA9";
+    const std::string upper_e_acute = "\xC3\x89";
+    const std::string lower_e_acute = "\xC3\xA9";
     size_t pos = 0;
     while ((pos = normalized.find(upper_e_acute, pos)) != std::string::npos) {
         normalized.replace(pos, upper_e_acute.size(), lower_e_acute);
