@@ -1,5 +1,15 @@
 menu "Xiaozhi Assistant"
 
+# DOC INÍCIO — Configuração privada da chave Gemini.
+# Defina a chave pelo menuconfig no ambiente local.
+# Não grave o valor real em arquivos versionados nem o compartilhe em commits.
+config DOC_GEMINI_API_KEY
+    string "Gemini API key for DOC camera"
+    default ""
+    help
+        Optional Gemini API key used by the DOC camera. Keep this value private.
+# DOC FIM — Configuração privada da chave Gemini.
+
 config OTA_URL
     string "Default OTA URL"
     default "https://api.tenclass.net/xiaozhi/ota/"
