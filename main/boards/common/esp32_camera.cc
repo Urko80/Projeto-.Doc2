@@ -74,6 +74,11 @@ void Esp32Camera::SetExplainUrl(const std::string& url, const std::string& token
 }
 
 bool Esp32Camera::Capture() {
+    // DOC INÍCIO — Exclusão mútua durante a captura.
+    // Evita que a tarefa da prévia substitua current_fb_ enquanto Explain() usa a foto.
+    std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+    // DOC FIM — Exclusão mútua durante a captura.
+
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -175,6 +180,11 @@ bool Esp32Camera::SetSwapBytes(bool enabled) {
 }
 
 std::expected<std::string, std::string> Esp32Camera::Explain(const std::string& question) {
+    // DOC INÍCIO — Exclusão mútua durante a análise da imagem.
+    // Mantém o quadro atual estável até terminar a conversão e o envio HTTP.
+    std::lock_guard<std::mutex> capture_lock(capture_mutex_);
+    // DOC FIM — Exclusão mútua durante a análise da imagem.
+
     if (explain_url_.empty()) {
         return std::unexpected("Image explain URL or token is not set");
     }
