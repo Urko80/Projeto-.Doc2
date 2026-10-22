@@ -944,10 +944,14 @@ void LcdDisplay::SetupUI() {
 // DOC — Etapa 1: ocultar a carinha original no centro. alterado adicionado
 lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
 
-    /* Middle layer: preview_image_ - centered display */
+    /* DOC — Prévia da câmera na região inferior da tela.
+     * Os olhos personalizados são criados depois deste objeto e ficam acima
+     * dele na ordem de desenho do LVGL. Ajuste o percentual para mudar a área
+     * reservada à imagem sem alterar o módulo custom_eyes.
+     */
     preview_image_ = lv_image_create(screen);
-    lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
-    lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(preview_image_, width_, height_ * 60 / 100);
+    lv_obj_align(preview_image_, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
 
 
@@ -1132,8 +1136,8 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     auto img_dsc = preview_image_cached_->image_dsc();
     lv_image_set_src(preview_image_, img_dsc);
     if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
-        // zoom factor 0.5
-        lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        // DOC — Ajusta a largura da imagem à tela (LVGL usa 256 como escala 1:1).
+        lv_image_set_scale(preview_image_, 256 * width_ / img_dsc->header.w);
     }
 
     // Hide emoji_box_
