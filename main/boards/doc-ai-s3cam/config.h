@@ -4,10 +4,10 @@
 #include <driver/gpio.h>
 
 // DOC AI S3CAM: ESP32-S3 N16R8
-// First milestone: native XiaoZhi Wi-Fi + I2S microphone/speaker.
-// Camera and ST7735 pins are recorded here but are not initialized by this first
-// board revision; they are deliberately kept out of the boot path until the
-// correct display driver and camera integration are added.
+// DOC INÍCIO — Recursos de hardware ativos nesta placa.
+// Wi-Fi/áudio usam o caminho nativo do XiaoZhi; display ST7735 e câmera OV3660
+// são inicializados em doc_ai_s3cam.cc. Mantenha a pinagem centralizada aqui.
+// DOC FIM — Recursos de hardware ativos nesta placa.
 
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
@@ -64,7 +64,8 @@
 #define CAMERA_PIN_PCLK  GPIO_NUM_13
 #define CAMERA_PIN_PWDN  GPIO_NUM_NC
 #define CAMERA_PIN_RESET GPIO_NUM_NC
-#define XCLK_FREQ_HZ     20000000
+// DOC — Frequência XCLK solicitada para a OV3660: 12 MHz.
+#define XCLK_FREQ_HZ     12000000
 
 // PCA9685 pins are intentionally not assigned here because the user's confirmed
 // pin list does not yet specify the driver's SDA/SCL wiring.
