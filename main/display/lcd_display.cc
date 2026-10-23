@@ -1226,11 +1226,43 @@ void LcdDisplay::ClearChatMessages() {
 #endif
 
 void LcdDisplay::SetEmotion(const char* emotion) {
-    // DOC — Encaminha a expressão ao módulo de olhos animados.
-    // A lógica original de emojis e GIFs continua abaixo, sem substituição.
-    if (custom_eyes_initialized_ && emotion != nullptr) {
-        CustomEyes_SetExpression(emotion);
+    // DOC INÍCIO — Prioriza os olhos animados do DOC e desativa emojis antigos.
+    // Depois da inicialização dos olhos, não deixa o fluxo legado desenhar emojis/GIFs.
+    if (custom_eyes_initialized_) {
+        if (emotion != nullptr) {
+            CustomEyes_SetExpression(emotion);
+
+            // Traduz estados de atividade para as animações dos olhos.
+            if (strcmp(emotion, "listening") == 0) {
+                CustomEyes_SetState(EYES_STATE_LISTENING);
+            } else if (strcmp(emotion, "speaking") == 0 ||
+                       strcmp(emotion, "talking") == 0) {
+                CustomEyes_SetState(EYES_STATE_SPEAKING);
+            } else if (strcmp(emotion, "thinking") == 0) {
+                CustomEyes_SetState(EYES_STATE_THINKING);
+            } else if (strcmp(emotion, "idle") == 0) {
+                CustomEyes_SetState(EYES_STATE_IDLE);
+            }
+        }
+
+        // Oculta qualquer imagem/emoticon legado que tenha ficado visível.
+        DisplayLockGuard lock(this);
+        if (gif_controller_) {
+            gif_controller_->Stop();
+            gif_controller_.reset();
+        }
+        if (emoji_image_ != nullptr) {
+            lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_label_ != nullptr) {
+            lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_box_ != nullptr) {
+            lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
     }
+    // DOC FIM — Prioriza os olhos animados do DOC e desativa emojis antigos.
 
     if (!setup_ui_called_) {
         ESP_LOGW(TAG, "SetEmotion('%s') called before SetupUI() - emotion will not be displayed!",
