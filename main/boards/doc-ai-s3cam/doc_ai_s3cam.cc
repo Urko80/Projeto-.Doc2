@@ -26,6 +26,7 @@ private:
     // DOC INÍCIO — Instância da câmera OV3660.
     // A classe comum do firmware administra a captura e os quadros da câmera.
     Camera* camera_ = nullptr;
+    TaskHandle_t camera_preview_task_ = nullptr;
     // DOC FIM — Instância da câmera OV3660.
 
     // DOC INÍCIO — Inicialização da câmera OV3660.
@@ -94,13 +95,20 @@ private:
         }
 
         // DOC — Pilha e prioridade conservadoras; ajustar após medir no hardware.
+        // DOC INÍCIO — Evita criar mais de uma tarefa de prévia.
+        if (camera_preview_task_ != nullptr) {
+            ESP_LOGI(TAG, "Camera preview task already running");
+            return;
+        }
+        // DOC FIM — Evita criar mais de uma tarefa de prévia.
+
         BaseType_t result = xTaskCreate(
             CameraPreviewTask,
             "doc_cam_preview",
             4096,
             this,
             2,
-            nullptr);
+            &camera_preview_task_);
 
         if (result != pdPASS) {
             ESP_LOGE(TAG, "Failed to create camera preview task");
@@ -186,8 +194,10 @@ public:
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
-        InitializeCamera();
-        StartCameraPreviewTask();
+        // DOC INÍCIO — Inicialização sem câmera.
+        // O sensor e a tarefa de prévia só serão iniciados após o comando de voz.
+        // InitializeCamera() e StartCameraPreviewTask() não devem ser chamados aqui.
+        // DOC FIM — Inicialização sem câmera.
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
@@ -214,11 +224,24 @@ public:
         return display_;
     }
 
-    // DOC INÍCIO — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
+    // DOC INÍCIO — Disponibiliza a câmera somente se ela já foi aberta.
     Camera* GetCamera() override {
         return camera_;
     }
-    // DOC FIM — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
+
+    // DOC INÍCIO — Inicializa a OV3660 apenas quando solicitada por voz.
+    Camera* OpenCamera() override {
+        if (camera_ == nullptr) {
+            ESP_LOGI(TAG, "Comando de voz recebido: inicializando câmera OV3660");
+            InitializeCamera();
+        }
+        if (camera_ != nullptr && camera_preview_task_ == nullptr) {
+            StartCameraPreviewTask();
+        }
+        return camera_;
+    }
+    // DOC FIM — Inicializa a OV3660 apenas quando solicitada por voz.
+    // DOC FIM — Disponibiliza a câmera somente se ela já foi aberta.
 };
 
 DECLARE_BOARD(DocAiS3Cam);
