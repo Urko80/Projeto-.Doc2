@@ -1,0 +1,3 @@
+DOC INÍCIO — Arquivo auxiliar para validar compilação do endpoint de visão sob demanda e dos olhos animados.
+Este arquivo não altera o firmware.
+DOC FIM — Arquivo auxiliar de validação.
