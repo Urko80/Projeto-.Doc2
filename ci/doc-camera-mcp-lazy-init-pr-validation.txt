@@ -1,0 +1,6 @@
+DOC INÍCIO — Validação da correção MCP de câmera sob demanda
+Branch: ci/doc-camera-mcp-lazy-init-pr
+Commit exato do PR #4: f458417c2635cdeea2267e7a86198b656be4706d
+Verificar build da variante doc-ai-s3cam e demais variantes selecionadas pela CI.
+Este arquivo é apenas um marcador de validação; não altera o firmware.
+DOC FIM — Validação da correção MCP de câmera sob demanda
