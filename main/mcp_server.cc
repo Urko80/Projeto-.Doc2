@@ -89,31 +89,60 @@ void McpServer::AddCommonTools() {
                 });
     }
 
-    auto camera = board.GetCamera();
-    if (camera) {
-        AddTool("self.camera.take_photo",
-                "Always remember you have a camera. If the user asks you to see something, use "
-                "this tool to take a photo and then explain it.\n"
-                "Args:\n"
-                "  `question`: The question that you want to ask about the photo.\n"
-                "Return:\n"
-                "  A JSON object that provides the photo information.",
-                PropertyList({Property("question", kPropertyTypeString)}),
-                [camera](const PropertyList& properties) -> ToolResult {
-                    // Lower the priority to do the camera capture
-                    TaskPriorityReset priority_reset(1);
+    // DOC INÍCIO — Ferramentas MCP da câmera sob demanda.
+    // Registra as ferramentas mesmo quando GetCamera() retorna nullptr na inicialização.
+    // Isso permite ao assistente descobrir os comandos sem ligar a OV3660 no boot.
+    AddTool("self.camera.open",
+            "Abre a câmera física do DOC e inicia a prévia ao vivo na tela. "
+            "Use quando o usuário pedir para abrir ou mostrar a câmera, ou ver a imagem ao vivo.",
+            PropertyList(),
+            [&board](const PropertyList& properties) -> ToolResult {
+                (void)properties;
+                Camera* camera = board.OpenCamera();
+                if (camera == nullptr) {
+                    return std::unexpected("Não foi possível inicializar a câmera do DOC");
+                }
+                return std::string("Câmera do DOC aberta; prévia iniciada.");
+            });
 
-                    if (!camera->Capture()) {
-                        return std::unexpected("Failed to capture photo");
-                    }
-                    auto question = properties["question"].value<std::string>();
-                    auto result = camera->Explain(question);
-                    if (!result) {
-                        return std::unexpected(std::move(result.error()));
-                    }
-                    return std::move(*result);
-                });
-    }
+    AddTool("self.camera.close",
+            "Fecha a câmera do DOC, encerra a prévia e retorna à interface normal dos olhos. "
+            "Use quando o usuário pedir para fechar a câmera ou voltar aos olhos.",
+            PropertyList(),
+            [&board](const PropertyList& properties) -> ToolResult {
+                (void)properties;
+                if (!board.CloseCamera()) {
+                    return std::unexpected("Não foi possível fechar a câmera do DOC");
+                }
+                return std::string("Câmera do DOC fechada; interface dos olhos restaurada.");
+            });
+
+    // A câmera é obtida no momento da chamada, não durante a inicialização do MCP.
+    // Assim, o ponteiro não fica preso a nullptr quando a câmera inicia desligada.
+    AddTool("self.camera.take_photo",
+            "Captura uma imagem da câmera do DOC e explica o que aparece nela. "
+            "Se a câmera ainda estiver fechada, abre-a sob demanda antes da captura. "
+            "Use quando o usuário perguntar o que está vendo ou pedir para identificar algo.",
+            PropertyList({Property("question", kPropertyTypeString)}),
+            [&board](const PropertyList& properties) -> ToolResult {
+                // DOC — Mantém a captura com prioridade baixa para preservar o áudio.
+                TaskPriorityReset priority_reset(1);
+
+                Camera* camera = board.OpenCamera();
+                if (camera == nullptr) {
+                    return std::unexpected("Não foi possível inicializar a câmera do DOC");
+                }
+                if (!camera->Capture()) {
+                    return std::unexpected("Falha ao capturar uma imagem da câmera do DOC");
+                }
+                auto question = properties["question"].value<std::string>();
+                auto result = camera->Explain(question);
+                if (!result) {
+                    return std::unexpected(std::move(result.error()));
+                }
+                return std::move(*result);
+            });
+    // DOC FIM — Ferramentas MCP da câmera sob demanda.
 #endif
 
     // Restore the original tools list to the end of the tools list
