@@ -62,6 +62,16 @@ Camera* Board::OpenCamera() { return GetCamera(); }
 bool Board::CloseCamera() { return GetCamera() == nullptr; }
 // DOC FIM — Fechamento padrão para placas sem câmera dedicada.
 
+// DOC INÍCIO — Encaminha o endpoint para câmeras já inicializadas.
+// Placas com inicialização tardia sobrescrevem este método para guardar a configuração.
+void Board::SetCameraVisionEndpoint(const std::string& url, const std::string& token) {
+    Camera* camera = GetCamera();
+    if (camera != nullptr) {
+        camera->SetExplainUrl(url, token);
+    }
+}
+// DOC FIM — Encaminha o endpoint de visão.
+
 Led* Board::GetLed() {
     static NoLed led;
     return &led;
