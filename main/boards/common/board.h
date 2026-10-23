@@ -73,6 +73,9 @@ public:
     virtual bool GetTemperature(float& esp32temp);
     virtual Display* GetDisplay();
     virtual Camera* GetCamera();
+    // DOC INÍCIO — Abre a câmera sob demanda; placas sem câmera mantêm o comportamento padrão.
+    virtual Camera* OpenCamera();
+    // DOC FIM — Abre a câmera sob demanda.
     virtual NetworkInterface* GetNetwork() = 0;
     virtual void StartNetwork() = 0;
     virtual void SetNetworkEventCallback(NetworkEventCallback callback) { (void)callback; }
