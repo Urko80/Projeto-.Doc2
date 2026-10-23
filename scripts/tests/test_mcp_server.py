@@ -106,6 +106,9 @@ class McpServerTest(unittest.TestCase):
                     AudioCodec* GetAudioCodec() { std::abort(); }
                     Backlight* GetBacklight() { return nullptr; }
                     Camera* GetCamera() { return nullptr; }
+                    Camera* OpenCamera() { return nullptr; }
+                    bool CloseCamera() { return true; }
+                    void SetCameraVisionEndpoint(const std::string&, const std::string&) {}
                 };
             ''',
             "display.h": "",

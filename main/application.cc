@@ -73,6 +73,36 @@ static bool IsDocVisionCommand(const std::string& text) {
            normalized == "doc o que e isso";
 }
 
+// DOC INÍCIO — Reconhece o comando explícito para abrir a câmera.
+// Aceita a palavra câmera com ou sem acento, conforme a transcrição do servidor.
+static bool IsDocOpenCameraCommand(const std::string& text) {
+    const std::string normalized = NormalizeDocVisionCommand(text);
+    return normalized == "doc abrir camera" ||
+           normalized == "doc abrir câmera" ||
+           normalized == "doc abre camera" ||
+           normalized == "doc abre câmera";
+}
+// DOC FIM — Reconhece o comando explícito para abrir a câmera.
+
+// DOC INÍCIO — Reconhece comandos para encerrar a câmera ou voltar aos olhos.
+// As formas com e sem acento são aceitas porque o STT pode variar a transcrição.
+static bool IsDocCloseCameraCommand(const std::string& text) {
+    const std::string normalized = NormalizeDocVisionCommand(text);
+    return normalized == "doc fechar camera" ||
+           normalized == "doc fechar câmera" ||
+           normalized == "doc fecha camera" ||
+           normalized == "doc fecha câmera";
+}
+
+static bool IsDocReturnToEyesCommand(const std::string& text) {
+    const std::string normalized = NormalizeDocVisionCommand(text);
+    return normalized == "doc voltar aos olhos" ||
+           normalized == "doc voltar para os olhos" ||
+           normalized == "doc volta aos olhos" ||
+           normalized == "doc volta para os olhos";
+}
+// DOC FIM — Reconhece comandos para encerrar a câmera ou voltar aos olhos.
+
 struct DocVisionTaskContext {
     Application* app;
     Camera* camera;
@@ -763,8 +793,41 @@ void Application::InitializeProtocol() {
                     display->SetChatMessage("user", message.c_str());
                 });
 
+                // DOC INÍCIO — Abrir a câmera apenas após o comando de voz.
+                // A inicialização normal do dispositivo não deve ligar o sensor.
+                if (IsDocOpenCameraCommand(text->valuestring)) {
+                    Schedule([display]() {
+                        Camera* camera = Board::GetInstance().OpenCamera();
+                        display->SetChatMessage(
+                            "system",
+                            camera != nullptr
+                                ? "Câmera aberta."
+                                : "Não foi possível inicializar a câmera.");
+                    });
+                }
+                // DOC FIM — Abrir a câmera apenas após o comando de voz.
+
+                // DOC INÍCIO — Fechar a câmera ou voltar aos olhos por comando de voz.
+                // A análise de visão tem prioridade: não liberar a câmera enquanto Explain() usa o quadro.
+                if (IsDocCloseCameraCommand(text->valuestring) ||
+                    IsDocReturnToEyesCommand(text->valuestring)) {
+                    Schedule([display]() {
+                        if (g_doc_vision_task_running.load()) {
+                            display->SetChatMessage(
+                                "system",
+                                "Aguarde a análise terminar antes de fechar a câmera.");
+                            return;
+                        }
+                        const bool closed = Board::GetInstance().CloseCamera();
+                        display->SetChatMessage(
+                            "system", closed ? "Câmera fechada. Olhos ativos."
+                                             : "Não foi possível fechar a câmera.");
+                    });
+                }
+                // DOC FIM — Fechar a câmera ou voltar aos olhos por comando de voz.
+
                 // DOC INÍCIO — Acionar análise somente para o comando de visão.
-                // A captura contínua continua funcionando, mas não chama Gemini por quadro.
+                // A análise não é iniciada por quadro nem ao abrir a câmera.
                 if (IsDocVisionCommand(text->valuestring)) {
                     bool expected_idle = false;
                     if (g_doc_vision_task_running.compare_exchange_strong(expected_idle, true)) {

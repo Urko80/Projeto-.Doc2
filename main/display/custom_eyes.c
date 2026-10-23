@@ -700,7 +700,9 @@ void CustomEyes_SetExpression(const char *expression)
     /* DOC — Mapeamento dos nomes recebidos para os presets visuais. */
     if (strcmp(normalized, "idle") == 0 ||
         strcmp(normalized, "neutral") == 0 ||
-        strcmp(normalized, "normal") == 0) {
+        strcmp(normalized, "normal") == 0 ||
+        strcmp(normalized, "robot_2") == 0 ||
+        strcmp(normalized, "robot-2") == 0) {
 
         current_state = EYES_STATE_IDLE;
         current_expression = DOC_EXPR_NEUTRAL;
@@ -726,7 +728,8 @@ void CustomEyes_SetExpression(const char *expression)
     } else if (strcmp(normalized, "happy") == 0 ||
                strcmp(normalized, "excited") == 0 ||
                strcmp(normalized, "love") == 0 ||
-               strcmp(normalized, "glee") == 0) {
+               strcmp(normalized, "glee") == 0 ||
+               strcmp(normalized, "cool") == 0) {
 
         current_expression = DOC_EXPR_HAPPY;
 

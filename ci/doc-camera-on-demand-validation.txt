@@ -1,0 +1,3 @@
+DOC INÍCIO — Arquivo de validação da alteração de inicialização sob demanda da câmera.
+Este arquivo não altera o firmware; sua inclusão gera um novo evento de atualização do PR para executar a CI.
+DOC FIM — Arquivo auxiliar de validação.

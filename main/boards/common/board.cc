@@ -53,6 +53,25 @@ Display* Board::GetDisplay() {
 
 Camera* Board::GetCamera() { return nullptr; }
 
+// DOC INÍCIO — Comportamento padrão para placas sem abertura de câmera sob demanda.
+Camera* Board::OpenCamera() { return GetCamera(); }
+// DOC FIM — Comportamento padrão para placas sem abertura de câmera sob demanda.
+
+// DOC INÍCIO — Fechamento padrão para placas sem câmera dedicada.
+// Se a placa já não expõe uma câmera, considera o estado fechado.
+bool Board::CloseCamera() { return GetCamera() == nullptr; }
+// DOC FIM — Fechamento padrão para placas sem câmera dedicada.
+
+// DOC INÍCIO — Encaminha o endpoint para câmeras já inicializadas.
+// Placas com inicialização tardia sobrescrevem este método para guardar a configuração.
+void Board::SetCameraVisionEndpoint(const std::string& url, const std::string& token) {
+    Camera* camera = GetCamera();
+    if (camera != nullptr) {
+        camera->SetExplainUrl(url, token);
+    }
+}
+// DOC FIM — Encaminha o endpoint de visão.
+
 Led* Board::GetLed() {
     static NoLed led;
     return &led;

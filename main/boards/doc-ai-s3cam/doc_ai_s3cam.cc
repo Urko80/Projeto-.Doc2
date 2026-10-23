@@ -10,6 +10,7 @@
 #include <driver/spi_master.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <atomic>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
@@ -26,6 +27,14 @@ private:
     // DOC INÍCIO — Instância da câmera OV3660.
     // A classe comum do firmware administra a captura e os quadros da câmera.
     Camera* camera_ = nullptr;
+    // DOC INÍCIO — Configuração de visão recebida do servidor XiaoZhi.
+    // Guarda URL/token enquanto a câmera estiver desligada no boot.
+    std::string camera_explain_url_;
+    std::string camera_explain_token_;
+    // DOC FIM — Configuração de visão.
+    TaskHandle_t camera_preview_task_ = nullptr;
+    std::atomic<bool> camera_preview_running_{false};
+    std::atomic<bool> camera_preview_stop_requested_{false};
     // DOC FIM — Instância da câmera OV3660.
 
     // DOC INÍCIO — Inicialização da câmera OV3660.
@@ -79,12 +88,17 @@ private:
         auto* board = static_cast<DocAiS3Cam*>(arg);
         constexpr uint32_t CAMERA_PREVIEW_INTERVAL_MS = 250;
 
-        while (true) {
+        while (!board->camera_preview_stop_requested_.load()) {
+            // A tarefa só usa camera_ dentro deste ciclo. O fechamento espera
+            // esta tarefa sair antes de destruir a instância da câmera.
             if (board->camera_ != nullptr) {
                 board->camera_->Capture();
             }
             vTaskDelay(pdMS_TO_TICKS(CAMERA_PREVIEW_INTERVAL_MS));
         }
+        // Sinaliza que nenhuma captura está em andamento antes de liberar a câmera.
+        board->camera_preview_running_.store(false);
+        vTaskDelete(nullptr);
     }
 
     void StartCameraPreviewTask() {
@@ -94,15 +108,26 @@ private:
         }
 
         // DOC — Pilha e prioridade conservadoras; ajustar após medir no hardware.
+        // DOC INÍCIO — Evita criar mais de uma tarefa de prévia.
+        if (camera_preview_task_ != nullptr) {
+            ESP_LOGI(TAG, "Camera preview task already running");
+            return;
+        }
+        // DOC FIM — Evita criar mais de uma tarefa de prévia.
+
+        camera_preview_stop_requested_.store(false);
+        camera_preview_running_.store(true);
         BaseType_t result = xTaskCreate(
             CameraPreviewTask,
             "doc_cam_preview",
             4096,
             this,
             2,
-            nullptr);
+            &camera_preview_task_);
 
         if (result != pdPASS) {
+            camera_preview_running_.store(false);
+            camera_preview_task_ = nullptr;
             ESP_LOGE(TAG, "Failed to create camera preview task");
         } else {
             ESP_LOGI(TAG, "Continuous camera preview task started");
@@ -186,8 +211,10 @@ public:
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
-        InitializeCamera();
-        StartCameraPreviewTask();
+        // DOC INÍCIO — Inicialização sem câmera.
+        // O sensor e a tarefa de prévia só serão iniciados após o comando de voz.
+        // InitializeCamera() e StartCameraPreviewTask() não devem ser chamados aqui.
+        // DOC FIM — Inicialização sem câmera.
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
@@ -214,11 +241,64 @@ public:
         return display_;
     }
 
-    // DOC INÍCIO — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
+    // DOC INÍCIO — Disponibiliza a câmera somente se ela já foi aberta.
     Camera* GetCamera() override {
         return camera_;
     }
-    // DOC FIM — Disponibiliza a câmera para os módulos compartilhados do XiaoZhi.
+
+    // DOC INÍCIO — Inicializa a OV3660 apenas quando solicitada por voz.
+    Camera* OpenCamera() override {
+        if (camera_ == nullptr) {
+            ESP_LOGI(TAG, "Comando de voz recebido: inicializando câmera OV3660");
+            InitializeCamera();
+        }
+        // DOC — Reaplica o endpoint guardado antes de iniciar a prévia/análise.
+        if (camera_ != nullptr && !camera_explain_url_.empty()) {
+            camera_->SetExplainUrl(camera_explain_url_, camera_explain_token_);
+        }
+        if (camera_ != nullptr && camera_preview_task_ == nullptr) {
+            StartCameraPreviewTask();
+        }
+        return camera_;
+    }
+    // DOC FIM — Inicializa a OV3660 apenas quando solicitada por voz.
+
+    // DOC INÍCIO — Guarda o endpoint MCP mesmo quando GetCamera() é nullptr.
+    void SetCameraVisionEndpoint(const std::string& url, const std::string& token) override {
+        camera_explain_url_ = url;
+        camera_explain_token_ = token;
+        if (camera_ != nullptr) {
+            camera_->SetExplainUrl(camera_explain_url_, camera_explain_token_);
+        }
+        ESP_LOGI(TAG, "Endpoint de visão atualizado%s",
+                 camera_explain_url_.empty() ? " (vazio)" : "");
+    }
+    // DOC FIM — Guarda o endpoint MCP.
+
+    // DOC INÍCIO — Encerramento sincronizado da câmera e da prévia.
+    // Aguarda a captura atual terminar, limpa a prévia e só então libera a câmera.
+    bool CloseCamera() override {
+        if (camera_ == nullptr) {
+            if (display_ != nullptr) display_->SetPreviewImage(nullptr);
+            return true;
+        }
+        if (camera_preview_task_ != nullptr) {
+            camera_preview_stop_requested_.store(true);
+            while (camera_preview_running_.load()) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            // O handle só é limpo depois que a tarefa confirma que terminou.
+            camera_preview_task_ = nullptr;
+        }
+        if (display_ != nullptr) display_->SetPreviewImage(nullptr);
+        delete camera_;
+        camera_ = nullptr;
+        camera_preview_stop_requested_.store(false);
+        ESP_LOGI(TAG, "Câmera fechada e recursos liberados");
+        return true;
+    }
+    // DOC FIM — Encerramento sincronizado da câmera e da prévia.
+    // DOC FIM — Disponibiliza a câmera somente se ela já foi aberta.
 };
 
 DECLARE_BOARD(DocAiS3Cam);
