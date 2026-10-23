@@ -428,9 +428,15 @@ static void update_eye_visual(eye_t *eye, int center_x, int center_y)
         blink_scale = clampf_local(blink_scale, 0.08f, 1.0f);
     }
 
-    /* DOC — A abertura afeta a altura, não a largura. */
-    float width = eye->width;
-    float height = eye->height * eye->open * blink_scale;
+    /* DOC INÍCIO — Redução proporcional dos olhos para a tela 128x160.
+     * Mantém as expressões e animações originais, mas reduz o desenho final
+     * para reservar espaço e evitar que os olhos encostem na prévia da câmera.
+     * Altere EYE_RENDER_SCALE para aumentar ou diminuir todos os olhos.
+     */
+    const float EYE_RENDER_SCALE = 0.80f;
+    float width = eye->width * EYE_RENDER_SCALE;
+    float height = eye->height * eye->open * blink_scale * EYE_RENDER_SCALE;
+    /* DOC FIM — Redução proporcional dos olhos para a tela 128x160. */
 
     int draw_w = (int)(width + 0.5f);
     int draw_h = (int)(height + 0.5f);
