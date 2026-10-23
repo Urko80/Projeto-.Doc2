@@ -27,6 +27,11 @@ private:
     // DOC INÍCIO — Instância da câmera OV3660.
     // A classe comum do firmware administra a captura e os quadros da câmera.
     Camera* camera_ = nullptr;
+    // DOC INÍCIO — Configuração de visão recebida do servidor XiaoZhi.
+    // Guarda URL/token enquanto a câmera estiver desligada no boot.
+    std::string camera_explain_url_;
+    std::string camera_explain_token_;
+    // DOC FIM — Configuração de visão.
     TaskHandle_t camera_preview_task_ = nullptr;
     std::atomic<bool> camera_preview_running_{false};
     std::atomic<bool> camera_preview_stop_requested_{false};
@@ -247,12 +252,28 @@ public:
             ESP_LOGI(TAG, "Comando de voz recebido: inicializando câmera OV3660");
             InitializeCamera();
         }
+        // DOC — Reaplica o endpoint guardado antes de iniciar a prévia/análise.
+        if (camera_ != nullptr && !camera_explain_url_.empty()) {
+            camera_->SetExplainUrl(camera_explain_url_, camera_explain_token_);
+        }
         if (camera_ != nullptr && camera_preview_task_ == nullptr) {
             StartCameraPreviewTask();
         }
         return camera_;
     }
     // DOC FIM — Inicializa a OV3660 apenas quando solicitada por voz.
+
+    // DOC INÍCIO — Guarda o endpoint MCP mesmo quando GetCamera() é nullptr.
+    void SetCameraVisionEndpoint(const std::string& url, const std::string& token) override {
+        camera_explain_url_ = url;
+        camera_explain_token_ = token;
+        if (camera_ != nullptr) {
+            camera_->SetExplainUrl(camera_explain_url_, camera_explain_token_);
+        }
+        ESP_LOGI(TAG, "Endpoint de visão atualizado%s",
+                 camera_explain_url_.empty() ? " (vazio)" : "");
+    }
+    // DOC FIM — Guarda o endpoint MCP.
 
     // DOC INÍCIO — Encerramento sincronizado da câmera e da prévia.
     // Aguarda a captura atual terminar, limpa a prévia e só então libera a câmera.
