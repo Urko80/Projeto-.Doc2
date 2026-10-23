@@ -1,0 +1,3 @@
+DOC INÍCIO — Arquivo temporário para disparar o GitHub Actions da validação da branch doc/layout-retrato-camera.
+Este arquivo não altera o firmware e deve ser removido após iniciar a execução do CI.
+DOC FIM — Arquivo temporário de disparo do CI.
