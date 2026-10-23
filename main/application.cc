@@ -73,6 +73,17 @@ static bool IsDocVisionCommand(const std::string& text) {
            normalized == "doc o que e isso";
 }
 
+// DOC INÍCIO — Reconhece o comando explícito para abrir a câmera.
+// Aceita a palavra câmera com ou sem acento, conforme a transcrição do servidor.
+static bool IsDocOpenCameraCommand(const std::string& text) {
+    const std::string normalized = NormalizeDocVisionCommand(text);
+    return normalized == "doc abrir camera" ||
+           normalized == "doc abrir câmera" ||
+           normalized == "doc abre camera" ||
+           normalized == "doc abre câmera";
+}
+// DOC FIM — Reconhece o comando explícito para abrir a câmera.
+
 struct DocVisionTaskContext {
     Application* app;
     Camera* camera;
@@ -763,8 +774,22 @@ void Application::InitializeProtocol() {
                     display->SetChatMessage("user", message.c_str());
                 });
 
+                // DOC INÍCIO — Abrir a câmera apenas após o comando de voz.
+                // A inicialização normal do dispositivo não deve ligar o sensor.
+                if (IsDocOpenCameraCommand(text->valuestring)) {
+                    Schedule([display]() {
+                        Camera* camera = Board::GetInstance().OpenCamera();
+                        display->SetChatMessage(
+                            "system",
+                            camera != nullptr
+                                ? "Câmera aberta."
+                                : "Não foi possível inicializar a câmera.");
+                    });
+                }
+                // DOC FIM — Abrir a câmera apenas após o comando de voz.
+
                 // DOC INÍCIO — Acionar análise somente para o comando de visão.
-                // A captura contínua continua funcionando, mas não chama Gemini por quadro.
+                // A análise não é iniciada por quadro nem ao abrir a câmera.
                 if (IsDocVisionCommand(text->valuestring)) {
                     bool expected_idle = false;
                     if (g_doc_vision_task_running.compare_exchange_strong(expected_idle, true)) {
