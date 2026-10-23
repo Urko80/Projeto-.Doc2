@@ -53,6 +53,10 @@ Display* Board::GetDisplay() {
 
 Camera* Board::GetCamera() { return nullptr; }
 
+// DOC INÍCIO — Comportamento padrão para placas sem abertura de câmera sob demanda.
+Camera* Board::OpenCamera() { return GetCamera(); }
+// DOC FIM — Comportamento padrão para placas sem abertura de câmera sob demanda.
+
 Led* Board::GetLed() {
     static NoLed led;
     return &led;
