@@ -28,6 +28,7 @@ private:
     // A classe comum do firmware administra a captura e os quadros da câmera.
     Camera* camera_ = nullptr;
     TaskHandle_t camera_preview_task_ = nullptr;
+    std::atomic<bool> camera_preview_running_{false};
     std::atomic<bool> camera_preview_stop_requested_{false};
     // DOC FIM — Instância da câmera OV3660.
 
@@ -91,7 +92,7 @@ private:
             vTaskDelay(pdMS_TO_TICKS(CAMERA_PREVIEW_INTERVAL_MS));
         }
         // Sinaliza que nenhuma captura está em andamento antes de liberar a câmera.
-        board->camera_preview_task_ = nullptr;
+        board->camera_preview_running_.store(false);
         vTaskDelete(nullptr);
     }
 
@@ -110,6 +111,7 @@ private:
         // DOC FIM — Evita criar mais de uma tarefa de prévia.
 
         camera_preview_stop_requested_.store(false);
+        camera_preview_running_.store(true);
         BaseType_t result = xTaskCreate(
             CameraPreviewTask,
             "doc_cam_preview",
@@ -119,6 +121,8 @@ private:
             &camera_preview_task_);
 
         if (result != pdPASS) {
+            camera_preview_running_.store(false);
+            camera_preview_task_ = nullptr;
             ESP_LOGE(TAG, "Failed to create camera preview task");
         } else {
             ESP_LOGI(TAG, "Continuous camera preview task started");
@@ -259,9 +263,11 @@ public:
         }
         if (camera_preview_task_ != nullptr) {
             camera_preview_stop_requested_.store(true);
-            while (camera_preview_task_ != nullptr) {
+            while (camera_preview_running_.load()) {
                 vTaskDelay(pdMS_TO_TICKS(10));
             }
+            // O handle só é limpo depois que a tarefa confirma que terminou.
+            camera_preview_task_ = nullptr;
         }
         if (display_ != nullptr) display_->SetPreviewImage(nullptr);
         delete camera_;
