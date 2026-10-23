@@ -57,6 +57,11 @@ Camera* Board::GetCamera() { return nullptr; }
 Camera* Board::OpenCamera() { return GetCamera(); }
 // DOC FIM — Comportamento padrão para placas sem abertura de câmera sob demanda.
 
+// DOC INÍCIO — Fechamento padrão para placas sem câmera dedicada.
+// Se a placa já não expõe uma câmera, considera o estado fechado.
+bool Board::CloseCamera() { return GetCamera() == nullptr; }
+// DOC FIM — Fechamento padrão para placas sem câmera dedicada.
+
 Led* Board::GetLed() {
     static NoLed led;
     return &led;
