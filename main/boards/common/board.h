@@ -76,6 +76,10 @@ public:
     // DOC INÍCIO — Abre a câmera sob demanda; placas sem câmera mantêm o comportamento padrão.
     virtual Camera* OpenCamera();
     // DOC FIM — Abre a câmera sob demanda.
+    // DOC INÍCIO — Armazena o endpoint de visão mesmo quando a câmera está fechada.
+    // Placas com câmera sob demanda devem aplicar esta configuração ao abrir o sensor.
+    virtual void SetCameraVisionEndpoint(const std::string& url, const std::string& token);
+    // DOC FIM — Armazena o endpoint de visão.
     // DOC INÍCIO — Fecha a câmera sob demanda; placas sem câmera podem manter o padrão.
     virtual bool CloseCamera();
     // DOC FIM — Fecha a câmera sob demanda.
