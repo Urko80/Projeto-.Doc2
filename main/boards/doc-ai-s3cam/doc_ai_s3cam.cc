@@ -10,6 +10,7 @@
 #include <driver/spi_master.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <atomic>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_vendor.h>
@@ -27,6 +28,7 @@ private:
     // A classe comum do firmware administra a captura e os quadros da câmera.
     Camera* camera_ = nullptr;
     TaskHandle_t camera_preview_task_ = nullptr;
+    std::atomic<bool> camera_preview_stop_requested_{false};
     // DOC FIM — Instância da câmera OV3660.
 
     // DOC INÍCIO — Inicialização da câmera OV3660.
@@ -80,12 +82,17 @@ private:
         auto* board = static_cast<DocAiS3Cam*>(arg);
         constexpr uint32_t CAMERA_PREVIEW_INTERVAL_MS = 250;
 
-        while (true) {
+        while (!board->camera_preview_stop_requested_.load()) {
+            // A tarefa só usa camera_ dentro deste ciclo. O fechamento espera
+            // esta tarefa sair antes de destruir a instância da câmera.
             if (board->camera_ != nullptr) {
                 board->camera_->Capture();
             }
             vTaskDelay(pdMS_TO_TICKS(CAMERA_PREVIEW_INTERVAL_MS));
         }
+        // Sinaliza que nenhuma captura está em andamento antes de liberar a câmera.
+        board->camera_preview_task_ = nullptr;
+        vTaskDelete(nullptr);
     }
 
     void StartCameraPreviewTask() {
@@ -102,6 +109,7 @@ private:
         }
         // DOC FIM — Evita criar mais de uma tarefa de prévia.
 
+        camera_preview_stop_requested_.store(false);
         BaseType_t result = xTaskCreate(
             CameraPreviewTask,
             "doc_cam_preview",
@@ -241,6 +249,28 @@ public:
         return camera_;
     }
     // DOC FIM — Inicializa a OV3660 apenas quando solicitada por voz.
+
+    // DOC INÍCIO — Encerramento sincronizado da câmera e da prévia.
+    // Aguarda a captura atual terminar, limpa a prévia e só então libera a câmera.
+    bool CloseCamera() override {
+        if (camera_ == nullptr) {
+            if (display_ != nullptr) display_->SetPreviewImage(nullptr);
+            return true;
+        }
+        if (camera_preview_task_ != nullptr) {
+            camera_preview_stop_requested_.store(true);
+            while (camera_preview_task_ != nullptr) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+        }
+        if (display_ != nullptr) display_->SetPreviewImage(nullptr);
+        delete camera_;
+        camera_ = nullptr;
+        camera_preview_stop_requested_.store(false);
+        ESP_LOGI(TAG, "Câmera fechada e recursos liberados");
+        return true;
+    }
+    // DOC FIM — Encerramento sincronizado da câmera e da prévia.
     // DOC FIM — Disponibiliza a câmera somente se ela já foi aberta.
 };
 
