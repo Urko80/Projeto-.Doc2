@@ -59,6 +59,15 @@ private:
         camera_config.grab_mode = CAMERA_GRAB_LATEST;
 
         camera_ = new Esp32Camera(camera_config);
+
+        // DOC INÍCIO — Correção da orientação vertical da OV3660.
+        // A imagem estava aparecendo de cabeça para baixo no display.
+        // Usa o controle do sensor para inverter a imagem sem copiar pixels manualmente.
+        if (camera_ != nullptr && !camera_->SetVFlip(true)) {
+            ESP_LOGW(TAG, "Não foi possível ativar o flip vertical da OV3660");
+        }
+        // DOC FIM — Correção da orientação vertical da OV3660.
+
         ESP_LOGI(TAG, "Camera OV3660 configured: XCLK=%d Hz", XCLK_FREQ_HZ);
     }
     // DOC FIM — Inicialização da câmera OV3660.
