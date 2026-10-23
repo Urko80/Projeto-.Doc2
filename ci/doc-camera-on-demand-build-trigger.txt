@@ -1,0 +1,3 @@
+DOC INÍCIO — Arquivo auxiliar para disparar a compilação CI da câmera sob demanda.
+Não altera o firmware; mantém a validação em branch isolada.
+DOC FIM — Arquivo auxiliar de CI.
