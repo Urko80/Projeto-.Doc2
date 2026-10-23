@@ -1135,10 +1135,13 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     auto img_dsc = preview_image_cached_->image_dsc();
     lv_image_set_src(preview_image_, img_dsc);
 
-    // DOC — Reserva a faixa inferior para a câmera e mantém os olhos na parte superior.
-    // Ajuste CAMERA_PREVIEW_MAX_WIDTH/HEIGHT caso queira alterar o tamanho da prévia.
+    // DOC INÍCIO — Layout vertical: olhos em cima e câmera maior embaixo.
+    // A tela é 128x160; 120x88 amplia a prévia mantendo a proporção 4:3
+    // da captura QQVGA (160x120), sem ocupar a faixa superior dos olhos.
+    // Para ajustar o tamanho, altere CAMERA_PREVIEW_MAX_WIDTH/HEIGHT.
     constexpr lv_coord_t CAMERA_PREVIEW_MAX_WIDTH = 120;
-    constexpr lv_coord_t CAMERA_PREVIEW_MAX_HEIGHT = 64;
+    constexpr lv_coord_t CAMERA_PREVIEW_MAX_HEIGHT = 88;
+    // DOC FIM — Layout vertical: olhos em cima e câmera maior embaixo.
     if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
         lv_coord_t zoom_w = (CAMERA_PREVIEW_MAX_WIDTH * 256) / img_dsc->header.w;
         lv_coord_t zoom_h = (CAMERA_PREVIEW_MAX_HEIGHT * 256) / img_dsc->header.h;
@@ -1146,8 +1149,10 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
         lv_image_set_scale(preview_image_, zoom);
     }
 
-    // DOC — Alinha a imagem abaixo da área dos olhos sem cobrir o topo da tela.
-    lv_obj_align(preview_image_, LV_ALIGN_BOTTOM_MID, 0, -18);
+    // DOC INÍCIO — Posicionamento da prévia na parte inferior.
+    // Margem inferior de 8 px; mantém a imagem afastada dos olhos na faixa superior.
+    lv_obj_align(preview_image_, LV_ALIGN_BOTTOM_MID, 0, -8);
+    // DOC FIM — Posicionamento da prévia na parte inferior.
 
     // A prévia da câmera é contínua; não interromper a animação dos olhos.
     lv_obj_remove_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
