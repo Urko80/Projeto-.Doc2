@@ -395,15 +395,15 @@ void McpServer::ParseCapabilities(const cJSON* capabilities) {
         auto url = cJSON_GetObjectItem(vision, "url");
         auto token = cJSON_GetObjectItem(vision, "token");
         if (cJSON_IsString(url)) {
-            auto camera = Board::GetInstance().GetCamera();
-            if (camera) {
-                std::string url_str = std::string(url->valuestring);
-                std::string token_str;
-                if (cJSON_IsString(token)) {
-                    token_str = std::string(token->valuestring);
-                }
-                camera->SetExplainUrl(url_str, token_str);
+            std::string url_str = std::string(url->valuestring);
+            std::string token_str;
+            if (cJSON_IsString(token)) {
+                token_str = std::string(token->valuestring);
             }
+            // DOC INÍCIO — Guarda a visão sem forçar a inicialização da câmera.
+            // A placa DOC aplicará o endpoint quando OpenCamera() for chamado.
+            Board::GetInstance().SetCameraVisionEndpoint(url_str, token_str);
+            // DOC FIM — Guarda a visão sob demanda.
         }
     }
 }
