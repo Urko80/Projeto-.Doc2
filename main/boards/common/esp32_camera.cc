@@ -241,17 +241,19 @@ bool Esp32Camera::Capture() {
         return false;
     }
 
-    // Get the latest frame, discard old frames for real-time performance
-    for (int i = 0; i < 2; i++) {
-        if (current_fb_) {
-            esp_camera_fb_return(current_fb_);
-        }
-        current_fb_ = esp_camera_fb_get();
-        if (!current_fb_) {
-            ESP_LOGE(TAG, "Camera capture failed");
-            return false;
-        }
+    // DOC INÍCIO — Captura de um único quadro por ciclo.
+    // CAMERA_GRAB_LATEST já privilegia o quadro mais recente; capturar duas
+    // vezes seguidas descartava trabalho e aumentava a carga da prévia.
+    if (current_fb_) {
+        esp_camera_fb_return(current_fb_);
+        current_fb_ = nullptr;
     }
+    current_fb_ = esp_camera_fb_get();
+    if (!current_fb_) {
+        ESP_LOGE(TAG, "Camera capture failed");
+        return false;
+    }
+    // DOC FIM — Captura de um único quadro por ciclo.
 
     // Prepare encode buffer for RGB565 format (with optional byte swapping)
     if (current_fb_->format == PIXFORMAT_RGB565) {
