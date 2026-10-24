@@ -27,18 +27,31 @@ Revisão feita na branch `main` disponível no momento da consulta. O firmware i
 - Não criar inicialização automática dos motores antes de definir comportamento de falha e de testar cada servo com alimentação apropriada.
 - Não trocar drivers ou sequências de inicialização da câmera/display/áudio.
 
-### 4. Próxima implementação proposta
+### 4. Auditoria do CI do PR #5
+
+Foi consultada a execução do workflow `Build Boards` associada ao commit `58e97bd88d1d72a8e3ca555b394623d2983771fe`.
+
+- O job parou em `Test build tooling`; a seleção de variantes e os builds das placas foram ignorados.
+- A suíte executou 125 testes e terminou com 3 falhas:
+  1. `test_board_menu_is_sorted_and_matches_cmake`: ordem natural dos nomes de placas não corresponde à ordem esperada.
+  2. `test_board_display_name_comes_from_kconfig_prompt`: nome com caracteres chineses foi lido com codificação corrompida (mojibake).
+  3. `test_current_matrix_uniqueness_and_p4_variants`: a mesma divergência de codificação do nome de placa.
+- O PR #5 altera apenas documentos em `docs/`, não os scripts de build nem os testes. Assim, as falhas observadas não apontam diretamente para uma regressão introduzida pelos arquivos deste PR; contudo, **não foi comprovado nesta auditoria que a branch `main` falhe da mesma forma**.
+- Como os testes falharam antes da seleção de variantes, não existe resultado de compilação de firmware para este commit. Não declarar o CI aprovado nem presumir que o firmware compila.
+- Próxima ação recomendada: reproduzir a suíte na base `main` e verificar locale/encoding e a ordenação do menu. Corrigir a infraestrutura de testes em mudança separada, se a falha também existir na base.
+
+### 5. Próxima implementação proposta
 
 Quando a pinagem e o commit de firmware estiverem confirmados:
 
 1. Criar um componente isolado para PCA9685 usando o driver I²C mestre disponível.
 2. Manter o componente inativo por padrão até a inicialização I²C ser explicitamente habilitada.
-3. Inicializar os quatro canais de servo com saídas em estado seguro, sem movimento na inicialização.
+3. Configurar os canais sem solicitar movimento espontâneo e separar a parada neutra dos servos de rotação contínua do desligamento de PWM.
 4. Integrar os sensores separadamente, validando cada dispositivo antes de habilitar movimento.
 5. Reutilizar `espressif/led_strip` se a API instalada for compatível com a versão do projeto.
-6. Executar build/CI e depois testar fisicamente; não confundir CI com validação de hardware.
+6. Corrigir/entender o CI e executar build da configuração da placa escolhida; depois testar fisicamente. Não confundir CI com validação de hardware.
 
-### 5. Marcadores de documentação de código
+### 6. Marcadores de documentação de código
 
 Todo código novo para o DOC deve conter comentários em português com marcadores claros `DOC INÍCIO` e `DOC FIM`, explicando a finalidade do bloco e os pontos que podem ser alterados.
 
