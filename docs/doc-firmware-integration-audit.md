@@ -38,7 +38,7 @@ Foi consultada a execução do workflow `Build Boards` associada ao commit `58e9
   3. `test_current_matrix_uniqueness_and_p4_variants`: a mesma divergência de codificação do nome de placa.
 - O PR #5 altera apenas documentos em `docs/`, não os scripts de build nem os testes. Assim, as falhas observadas não apontam diretamente para uma regressão introduzida pelos arquivos deste PR; contudo, **não foi comprovado nesta auditoria que a branch `main` falhe da mesma forma**.
 - Como os testes falharam antes da seleção de variantes, não existe resultado de compilação de firmware para este commit. Não declarar o CI aprovado nem presumir que o firmware compila.
-- Próxima ação recomendada: reproduzir a suíte na base `main` e verificar locale/encoding e a ordenação do menu. Corrigir a infraestrutura de testes em mudança separada, se a falha também existir na base.
+- Próxima ação recomendada: reproduzir a suíte na base `main` para estabelecer o baseline. Em mudança separada, corrigir o texto de origem em `main/Kconfig.projbuild` e investigar a ordenação natural do menu; validar a lista resultante antes de alterar a ordem de opções apresentada ao usuário.
 
 ### 5. Próxima implementação proposta
 
