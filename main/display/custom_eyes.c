@@ -44,7 +44,7 @@ static const char *TAG = "CustomEyes";
 #define EYE_DISTANCE                52
 
 /* DOC — Valor negativo sobe os olhos; positivo desce os olhos. */
-#define EYE_CENTER_Y_OFFSET         (-10)
+#define EYE_CENTER_Y_OFFSET         (-5)
 
 /* DOC — Dimensões iniciais dos olhos, em pixels. */
 #define EYE_WIDTH_BASE              36
