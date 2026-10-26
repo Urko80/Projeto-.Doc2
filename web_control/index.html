@@ -122,7 +122,7 @@
 
   // Normaliza o endereço informado; não guarda credenciais ou dados em armazenamento.
   function apiBase() {
-    return document.getElementById('deviceUrl').value.trim().replace(/\\/+$/, '');
+    return document.getElementById('deviceUrl').value.trim().replace(/\/+$/, '');
   }
 
   // Faz requisições JSON à API do ESP32 e apresenta erros de rede de forma explícita.
