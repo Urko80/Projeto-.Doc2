@@ -1,52 +1,43 @@
-# .DOC Control Center — protótipo web
+# .DOC Control Center — painel web experimental
 
 ## Estado atual
 
-Esta pasta contém uma interface web responsiva para o Projeto .DOC. A versão atual é **somente uma prévia local**: os controles alteram a tela, mas não enviam comandos ao ESP32 nem movimentam os servos.
+A interface passou a chamar a API HTTP experimental do firmware para consultar status, enviar pulsos aos SG90 das pernas (CH0/CH3) e solicitar parada dos MG90S das rodas. Ainda **não foi compilada nem testada com hardware real**.
 
-## Arquivo
+## Como usar após compilar e gravar a branch de teste
 
-- `index.html`: interface, estilos e lógica de demonstração, comentados em português com marcadores `DOC INÍCIO` e `DOC FIM`.
+1. Conecte o ESP32-S3-CAM à mesma rede Wi-Fi do computador/celular.
+2. Consulte o IP atribuído à placa no roteador ou no log serial.
+3. Abra `index.html` localmente no navegador.
+4. No campo “Endereço da API”, informe `http://IP-DA-PLACA` e pressione **Testar conexão**.
+5. Faça primeiro testes de pernas com o mecanismo livre e a alimentação dos servos verificada.
 
-## Canais e calibração registrados
+O navegador pode bloquear a conexão por política de rede local/CORS ou firewall. A API define cabeçalhos CORS para permitir uma página local; isso não substitui autenticação.
 
-| Canal PCA9685 | Servo | Referência registrada |
+## Endpoints do firmware
+
+- `GET /api/status`: consulta status e calibração corrente.
+- `POST /api/servo`: `{"channel":0,"pulse_us":1500}` ou canal 3.
+- `POST /api/legs`: `{"left_us":1500,"right_us":1500}`.
+- `POST /api/wheels`: `{"left":"cw","right":"ccw"}`; cada lado aceita `cw`, `ccw` ou `stop`.
+- `POST /api/stop`: tenta parar os dois motores contínuos.
+
+## Mapa de canais e valores registrados
+
+| Canal PCA9685 | Servo | Valores registrados |
 |---:|---|---|
-| 0 | SG90 — perna 1 | Centro de teste 1500 µs; curso mecânico pendente |
-| 1 | MG90S — roda 1 | Horário 1665 µs; neutro 1705 µs; anti-horário 1750 µs |
-| 2 | MG90S — roda 2 | Horário 1665 µs; neutro 1705 µs; anti-horário 1755 µs |
-| 3 | SG90 — perna 2 | Centro inicial proposto 1500 µs; validar na montagem |
+| 0 | SG90 — perna 1 | 1500 µs centro de teste; faixa inicial da API 1250–1750 µs |
+| 1 | MG90S — roda 1 | horário 1665 µs; neutro 1705 µs; anti-horário 1750 µs |
+| 2 | MG90S — roda 2 | horário 1665 µs; neutro 1705 µs; anti-horário 1755 µs |
+| 3 | SG90 — perna 2 | 1500 µs centro; faixa inicial da API 1250–1750 µs |
 
-Os valores dos MG90S foram observados nos testes deste projeto. Não copiar automaticamente esses pulsos para outros servos. Os extremos mecânicos dos SG90 ainda não estão confirmados.
+Os valores dos motores contínuos são calibrações medidas para esta montagem. Não os aplique a outros servos sem calibrar.
 
-## Arquitetura pretendida
+## Limitações e segurança
 
-1. O navegador abre a interface servida pelo ESP32-S3-CAM via Wi-Fi.
-2. A página envia comandos HTTP para endpoints locais do firmware.
-3. O firmware valida os parâmetros e controla o PCA9685 por I²C.
-4. O firmware rejeita valores fora dos limites configurados e fornece um comando de parada.
-
-### API proposta — ainda não implementada
-
-- `GET /api/status`: estado da conexão, modo de operação e canais disponíveis.
-- `POST /api/servo`: ajustar um canal angular individual, recebendo `channel` e `pulse_us`.
-- `POST /api/legs`: ajustar canais 0 e 3, recebendo `left_us` e `right_us`.
-- `POST /api/wheels`: comando de direção e velocidade solicitada, convertido em pulsos com base no neutro calibrado de cada MG90S.
-- `POST /api/stop`: solicitar parada de ambos os MG90S e movimento seguro dos SG90 conforme a política definida no firmware.
-- `GET /api/calibration`: ler calibrações atuais.
-- `POST /api/calibration`: gravar calibrações validadas de forma persistente.
-
-Os endpoints acima são uma proposta de contrato; não estão implementados nesta etapa.
-
-## Segurança e próximos passos
-
-- Manter os testes de servo individual até validar a alimentação de 5 V.
-- Começar com faixa conservadora para as pernas e ampliar somente após validar a mecânica.
-- Não tratar o botão de parada da interface como parada de emergência física enquanto não houver confirmação de recebimento do comando.
-- Adicionar timeout no firmware: se a comunicação cair, os motores de rotação contínua devem retornar ao neutro.
-- Validar os dados recebidos, limitar a frequência de comandos e evitar acesso externo não autorizado.
-- Implementar e testar o backend ESP-IDF separadamente; não gravar o firmware funcional até revisão e validação.
-
-## Organização do código
-
-O HTML contém comentários em português e marcadores `DOC INÍCIO` / `DOC FIM` para localizar as partes de estilo, pernas, rodas, calibração e eventos de interface.
+- A API não tem autenticação: use apenas em uma rede local confiável; não encaminhe a porta 80 para a internet.
+- O controle de movimento das rodas permanece bloqueado na interface até validar o sentido físico de cada motor com o robô suspenso.
+- O watchdog do firmware tenta parar as rodas após 1,5 s sem novo comando de roda; não é uma parada de emergência certificada.
+- A calibração não é gravada em NVS.
+- GPIO19/GPIO20 são usados como SDA/SCL e também são USB D-/D+ do ESP32-S3. Não use USB nativo simultaneamente; use o conversor USB-UART externo.
+- A interface e a API ainda precisam de compilação, revisão e teste controlado na placa. Não gravar na placa principal antes da revisão.
