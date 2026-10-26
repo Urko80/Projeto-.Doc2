@@ -100,6 +100,16 @@ static esp_err_t PcaSetPulse(uint8_t channel, uint16_t pulse_us) {
     return i2c_master_transmit(s_pca, data, sizeof(data), 100);
 }
 
+// DOC INÍCIO — desativa a saída PWM de um canal sem mover o servo
+static esp_err_t PcaSetChannelOff(uint8_t channel) {
+    if (s_pca == nullptr || channel > 15) return ESP_ERR_INVALID_ARG;
+    const uint8_t reg = static_cast<uint8_t>(REG_LED0_ON_L + 4U * channel);
+    // Bit FULL_OFF (bit 4 de LEDn_OFF_H) desliga completamente o canal.
+    const uint8_t data[] = {reg, 0, 0, 0, 0x10};
+    return i2c_master_transmit(s_pca, data, sizeof(data), 100);
+}
+// DOC FIM
+
 static esp_err_t PcaInitialize() {
     i2c_master_bus_config_t bus_cfg = {};
     bus_cfg.i2c_port = I2C_NUM_0;
@@ -133,11 +143,14 @@ static esp_err_t PcaInitialize() {
     err = PcaWrite(REG_MODE1, MODE1_RESTART | MODE1_AI);
     if (err != ESP_OK) return err;
 
-    // Inicialização em posições neutras; sem movimentos automáticos.
-    if ((err = PcaSetPulse(0, 1500)) != ESP_OK) return err;
+    // DOC INÍCIO — segurança na inicialização
+    // Mantém as pernas sem sinal PWM para evitar movimento inesperado ao conectar.
+    // As rodas recebem o pulso neutro calibrado para solicitar parada.
+    if ((err = PcaSetChannelOff(0)) != ESP_OK) return err;
     if ((err = PcaSetPulse(1, WHEEL_LEFT_STOP_US)) != ESP_OK) return err;
     if ((err = PcaSetPulse(2, WHEEL_RIGHT_STOP_US)) != ESP_OK) return err;
-    if ((err = PcaSetPulse(3, 1500)) != ESP_OK) return err;
+    if ((err = PcaSetChannelOff(3)) != ESP_OK) return err;
+    // DOC FIM
     return ESP_OK;
 }
 
