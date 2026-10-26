@@ -58,8 +58,11 @@
   </nav>
 
   <section class="panel" id="connectionNotice">
-    <h2>Modo de demonstração</h2>
-    <p class="muted">Esta página ainda não está conectada ao ESP32. Os controles abaixo alteram a interface, mas não movimentam os servos até o firmware implementar a API descrita no README.</p>
+    <h2>Conectar ao DOC</h2>
+    <p class="muted">Digite o endereço IP mostrado pelo roteador para a placa. Abra esta página em um dispositivo na mesma rede Wi-Fi.</p>
+    <div class="field"><label for="deviceUrl">Endereço da API</label><input id="deviceUrl" type="text" inputmode="url" placeholder="http://192.168.1.123" value="http://192.168.1.123"></div>
+    <div class="actions"><button class="action primary" id="connectDevice">Testar conexão</button></div>
+    <p class="muted">A API ainda não tem autenticação. Use somente em rede confiável. O controle das rodas ficará bloqueado na interface até confirmar o sentido de montagem dos dois motores.</p>
   </section>
 
   <!-- DOC INÍCIO — ABA PERNAS: SG90 NOS CANAIS 0 E 3 -->
@@ -110,11 +113,27 @@
   <!-- DOC FIM — ABA CALIBRAÇÃO -->
 
   <div class="status-line" id="statusLine" role="status" aria-live="polite">Pronto — modo de demonstração, sem ligação ao hardware.</div>
-  <p class="muted">DOC INÍCIO — Ações de interface documentadas em app.js na próxima etapa. Nenhum comando é enviado ao hardware nesta versão.</p>
+  <p class="muted">DOC INÍCIO — DOC INÍCIO — Ações HTTP comentadas no próprio arquivo index.html. Confirme o recebimento antes de movimentar o robô.</p>
 </main>
 <script>
-  /* DOC INÍCIO — NAVEGAÇÃO ENTRE ABAS E CONTROLES LOCAIS */
+  /* DOC INÍCIO — NAVEGAÇÃO, CONEXÃO HTTP E COMANDOS DE PERNAS */
   const statusLine = document.getElementById('statusLine');
+  const connectionBadge = document.getElementById('connectionBadge');
+
+  // Normaliza o endereço informado; não guarda credenciais ou dados em armazenamento.
+  function apiBase() {
+    return document.getElementById('deviceUrl').value.trim().replace(/\\/+$/, '');
+  }
+
+  // Faz requisições JSON à API do ESP32 e apresenta erros de rede de forma explícita.
+  async function apiRequest(path, method = 'GET', payload = null) {
+    const options = { method, headers: { 'Content-Type': 'application/json' } };
+    if (payload !== null) options.body = JSON.stringify(payload);
+    const response = await fetch(apiBase() + path, options);
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + response.status));
+    return data;
+  }
 
   // Alterna as três abas sem recarregar a página.
   document.querySelectorAll('[data-tab]').forEach(button => {
@@ -125,7 +144,7 @@
     });
   });
 
-  // Atualiza os números exibidos; ainda não envia pulsos ao PCA9685.
+  // Atualiza os valores exibidos nos controles deslizantes.
   [['leg0','leg0Value'], ['leg3','leg3Value']].forEach(([inputId, outputId]) => {
     const input = document.getElementById(inputId);
     const output = document.getElementById(outputId);
@@ -135,7 +154,21 @@
     document.getElementById('speedValue').value = event.target.value + '%';
   });
 
-  // Botões de preset mudam apenas o valor local nesta versão.
+  // Testa a conectividade consultando o endpoint de status.
+  document.getElementById('connectDevice').addEventListener('click', async () => {
+    try {
+      const state = await apiRequest('/api/status');
+      connectionBadge.textContent = 'API conectada';
+      connectionBadge.style.color = 'var(--accent)';
+      statusLine.textContent = 'API respondeu. PCA9685: ' + state.pca9685 + '; PWM: ' + state.frequency_hz + ' Hz.';
+    } catch (error) {
+      connectionBadge.textContent = 'Sem conexão';
+      connectionBadge.style.color = 'var(--danger)';
+      statusLine.textContent = 'Falha ao conectar: ' + error.message + '. Confira IP, Wi-Fi e log serial.';
+    }
+  });
+
+  // Presets alteram apenas os valores locais; o envio exige clicar em um botão de comando.
   document.querySelectorAll('[data-preset]').forEach(button => {
     button.addEventListener('click', () => {
       button.dataset.preset.split(',').forEach(pair => {
@@ -144,23 +177,47 @@
         input.value = value;
         input.dispatchEvent(new Event('input'));
       });
-      statusLine.textContent = 'Preset aplicado à interface local; nenhum comando enviado ao ESP32.';
+      statusLine.textContent = 'Preset preparado. Clique em Enviar para aplicar ao hardware.';
     });
   });
 
-  // Botões de envio estão deliberadamente bloqueados para hardware até a API existir.
-  document.querySelectorAll('[data-send]').forEach(button => button.addEventListener('click', () => {
-    statusLine.textContent = 'Ainda não conectado: endpoint de controle do firmware não implementado.';
+  // Envia somente os canais SG90 CH0 e CH3, com limites também verificados no firmware.
+  document.querySelectorAll('[data-send]').forEach(button => button.addEventListener('click', async () => {
+    try {
+      if (button.dataset.send === 'leg0' || button.dataset.send === 'leg3') {
+        const channel = button.dataset.send === 'leg0' ? 0 : 3;
+        const inputId = channel === 0 ? 'leg0' : 'leg3';
+        await apiRequest('/api/servo', 'POST', { channel, pulse_us: Number(document.getElementById(inputId).value) });
+      } else if (button.dataset.send === 'legs') {
+        await apiRequest('/api/legs', 'POST', {
+          left_us: Number(document.getElementById('leg0').value),
+          right_us: Number(document.getElementById('leg3').value)
+        });
+      }
+      statusLine.textContent = 'Comando de perna enviado e confirmado pela API.';
+    } catch (error) {
+      statusLine.textContent = 'Comando não confirmado: ' + error.message;
+    }
   }));
+
+  // O sentido físico de montagem das rodas ainda precisa ser confirmado.
+  // Não enviar comandos de movimento até verificar cada roda com o robô suspenso.
   document.getElementById('sendWheels').addEventListener('click', () => {
-    statusLine.textContent = 'Ainda não conectado: comando de rodas não enviado ao hardware.';
+    statusLine.textContent = 'Movimento bloqueado na interface até confirmar o sentido de cada roda em teste suspenso.';
   });
-  document.getElementById('stopWheels').addEventListener('click', () => {
+
+  // A parada envia um comando real; se não houver resposta, o status informa a falha.
+  document.getElementById('stopWheels').addEventListener('click', async () => {
     document.getElementById('speed').value = 0;
     document.getElementById('speed').dispatchEvent(new Event('input'));
-    statusLine.textContent = 'Velocidade zerada apenas na interface; ainda não é parada física de emergência.';
+    try {
+      await apiRequest('/api/stop', 'POST', {});
+      statusLine.textContent = 'API confirmou a parada das duas rodas.';
+    } catch (error) {
+      statusLine.textContent = 'Parada não confirmada pela API: ' + error.message + '. Desligue a alimentação dos servos se houver movimento.';
+    }
   });
-  /* DOC FIM — NAVEGAÇÃO ENTRE ABAS E CONTROLES LOCAIS */
+  /* DOC FIM — NAVEGAÇÃO, CONEXÃO HTTP E COMANDOS DE PERNAS */
 </script>
 </body>
 </html>
