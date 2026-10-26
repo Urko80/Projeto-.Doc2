@@ -44,18 +44,18 @@ namespace {
 static const char* TAG = "doc_web_servo_api";
 
 // DOC INÍCIO — hardware e limites verificados no Projeto .DOC
-constexpr gpio_num_t PCA_SDA_GPIO = GPIO_NUM_19;
-constexpr gpio_num_t PCA_SCL_GPIO = GPIO_NUM_20;
-constexpr uint8_t PCA9685_ADDRESS = 0x40;
-constexpr uint32_t I2C_FREQUENCY_HZ = 100000;
-constexpr uint16_t SERVO_MIN_US = 1250;
-constexpr uint16_t SERVO_MAX_US = 1750;
-constexpr uint16_t WHEEL_LEFT_CW_US = 1665;
-constexpr uint16_t WHEEL_LEFT_STOP_US = 1705;
-constexpr uint16_t WHEEL_LEFT_CCW_US = 1750;
-constexpr uint16_t WHEEL_RIGHT_CW_US = 1665;
-constexpr uint16_t WHEEL_RIGHT_STOP_US = 1705;
-constexpr uint16_t WHEEL_RIGHT_CCW_US = 1755;
+constexpr gpio_num_t PCA_SDA_GPIO = PCA9685_SDA_GPIO;
+constexpr gpio_num_t PCA_SCL_GPIO = PCA9685_SCL_GPIO;
+constexpr uint8_t PCA9685_ADDRESS = PCA9685_I2C_ADDRESS;
+constexpr uint32_t I2C_FREQUENCY_HZ = PCA9685_I2C_FREQUENCY_HZ;
+constexpr uint16_t SERVO_MIN_US = DOC_LEG_SERVO_MIN_US;
+constexpr uint16_t SERVO_MAX_US = DOC_LEG_SERVO_MAX_US;
+constexpr uint16_t WHEEL_LEFT_CW_US = DOC_WHEEL_LEFT_CW_US;
+constexpr uint16_t WHEEL_LEFT_STOP_US = DOC_WHEEL_LEFT_STOP_US;
+constexpr uint16_t WHEEL_LEFT_CCW_US = DOC_WHEEL_LEFT_CCW_US;
+constexpr uint16_t WHEEL_RIGHT_CW_US = DOC_WHEEL_RIGHT_CW_US;
+constexpr uint16_t WHEEL_RIGHT_STOP_US = DOC_WHEEL_RIGHT_STOP_US;
+constexpr uint16_t WHEEL_RIGHT_CCW_US = DOC_WHEEL_RIGHT_CCW_US;
 constexpr uint32_t WHEEL_WATCHDOG_MS = 1500;
 // DOC FIM
 
@@ -425,13 +425,29 @@ extern "C" void DocWebServoApiStart(void) {
 }
 
 extern "C" void DocWebServoApiStop(void) {
+    // Bloqueia novos comandos HTTP antes de parar os motores.
     if (s_http != nullptr) {
         httpd_stop(s_http);
         s_http = nullptr;
     }
+
+    if (s_mutex != nullptr && s_pca != nullptr &&
+        xSemaphoreTake(s_mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        StopWheelsLocked();
+        xSemaphoreGive(s_mutex);
+    }
+
     if (s_watchdog_task != nullptr) {
         vTaskDelete(s_watchdog_task);
         s_watchdog_task = nullptr;
+    }
+    if (s_pca != nullptr && s_i2c_bus != nullptr) {
+        i2c_master_bus_rm_device(s_pca);
+        s_pca = nullptr;
+    }
+    if (s_i2c_bus != nullptr) {
+        i2c_del_master_bus(s_i2c_bus);
+        s_i2c_bus = nullptr;
     }
     if (s_mutex != nullptr) {
         vSemaphoreDelete(s_mutex);
