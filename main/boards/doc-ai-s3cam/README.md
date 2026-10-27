@@ -34,6 +34,10 @@
 
 Os limites de pulso das pernas são uma faixa inicial validada em testes, não uma garantia de segurança para qualquer montagem. Os pulsos das rodas são calibrações medidas para os motores deste robô.
 
+## Painel web embutido
+
+Depois de gravar o firmware com esta alteração e conectar o DOC ao Wi-Fi, abra `http://IP-DO-DOC/` em um celular ou computador conectado à mesma rede. A rota `/index.html` também serve o painel. A interface e a API usam a mesma porta HTTP (80), sem servidor separado no computador.
+
 ## API HTTP experimental
 
 Quando a placa está conectada ao Wi-Fi, a API responde na porta 80 do endereço IP atribuído pelo roteador:
@@ -50,7 +54,8 @@ Valores permitidos para rodas: `cw`, `ccw` e `stop`. Um watchdog solicita parada
 
 ### Segurança e limitações conhecidas
 - API ainda sem autenticação: usar somente em rede local confiável; não encaminhar a porta 80 para a internet.
-- A interface `web_control/index.html` ainda precisa ser ligada aos endpoints; nesta etapa, API e interface não são automaticamente servidas na mesma página.
+- A interface responsiva é embutida no firmware para a placa DOC e servida nas rotas `/` e `/index.html`; o arquivo-fonte é `web_control/index.html` e a cópia usada na compilação é `main/boards/doc-ai-s3cam/web_control.html`.
+- Ao abrir a página diretamente pelo IP da ESP32, o endereço da API é preenchido automaticamente com a mesma origem. Para usar a interface hospedada no computador, mantenha o IP do DOC no campo de conexão.
 - O estado de calibração não é persistido em NVS.
 - A API inicia o PCA9685 quando o Wi-Fi conecta. Se o driver I²C/PCA falhar, consultar o log serial antes de testar servos.
 - O código ainda não foi compilado nesta sessão nem validado na placa. Não gravar no firmware principal antes de concluir build e revisão.
