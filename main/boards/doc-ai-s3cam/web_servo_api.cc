@@ -10,16 +10,20 @@
  *
  * Segurança e validação:
  * - Os pulsos são validados no firmware, não apenas na interface.
- * - CH1/CH2 são MG90S contínuos: CW=1665 us, stop=1705 us, CCW=1750/1755 us.
- * - CH0/CH3 são SG90: faixa inicial conservadora validada de 1250 a 1750 us.
- * - Um watchdog para as rodas após 1,5 s sem novo comando de roda.
- * - A API não possui autenticação nesta primeira versão: use apenas em uma
- *   rede Wi-Fi confiável. Não exponha a porta 80 à internet.
+ * - CH1/CH2 são MG90S contínuos: CW=1665 us, stop=1705 us, CCW=1800 us (valor de teste ainda não validado).
+ * - CH0/CH3 são SG90: faixa inicial de 1250 a 1750 us; limites mecânicos finais
+ *   dependem da montagem.
+ * - CH1/CH2: CW=1665 us, neutro=1705 us e CCW=1800 us foram confirmados nos
+ *   testes físicos desta montagem.
+ * - O watchdog tenta parar as rodas após 1,5 s sem novo comando; não é uma parada
+ *   de emergência certificada.
+ * - A API não possui autenticação e permite CORS amplo: use apenas em rede
+ *   confiável e não exponha a porta 80 à internet.
  *
  * Limitações:
  * - Não salva calibração em NVS.
- * - O servidor é API JSON; a interface HTML ainda precisa chamar estes endpoints.
- * - A compilação com a versão local do ESP-IDF ainda deve ser executada.
+ * - A interface chama os endpoints abaixo; velocidade variável não implementada.
+ * - Confirme o build do commit atual antes de integrar o PR.
  * DOC FIM
  */
 
@@ -72,8 +76,11 @@ static httpd_handle_t s_http = nullptr;
 static SemaphoreHandle_t s_mutex = nullptr;
 static TaskHandle_t s_watchdog_task = nullptr;
 static bool s_started = false;
+// Os pulsos das pernas começam como referências, mas os canais ficam OFF.
 static uint16_t s_leg_left_us = 1500;
 static uint16_t s_leg_right_us = 1500;
+static bool s_leg_left_enabled = false;
+static bool s_leg_right_enabled = false;
 static uint16_t s_wheel_left_us = WHEEL_LEFT_STOP_US;
 static uint16_t s_wheel_right_us = WHEEL_RIGHT_STOP_US;
 static TickType_t s_last_wheel_command = 0;
@@ -194,10 +201,11 @@ static esp_err_t StatusHandler(httpd_req_t* req) {
     char json[256];
     snprintf(json, sizeof(json),
         "{\"ok\":true,\"pca9685\":\"0x40\",\"frequency_hz\":50,"
-        "\"legs\":{\"left_us\":%u,\"right_us\":%u,\"min_us\":%u,\"max_us\":%u},"
+        "\"legs\":{\"left_us\":%u,\"right_us\":%u,\"left_enabled\":%s,\"right_enabled\":%s,\"min_us\":%u,\"max_us\":%u},"
         "\"wheels\":{\"left_us\":%u,\"right_us\":%u,\"stop_us\":%u}}",
-        s_leg_left_us, s_leg_right_us, SERVO_MIN_US, SERVO_MAX_US,
-        s_wheel_left_us, s_wheel_right_us, WHEEL_LEFT_STOP_US);
+        s_leg_left_us, s_leg_right_us,
+        s_leg_left_enabled ? "true" : "false", s_leg_right_enabled ? "true" : "false",
+        SERVO_MIN_US, SERVO_MAX_US, s_wheel_left_us, s_wheel_right_us, WHEEL_LEFT_STOP_US);
     SendJson(req, json);
     return ESP_OK;
 }
@@ -229,8 +237,8 @@ static esp_err_t ServoHandler(httpd_req_t* req) {
     const uint16_t us = static_cast<uint16_t>(pulse->valueint);
     esp_err_t err = PcaSetPulse(ch, us);
     if (err == ESP_OK) {
-        if (ch == 0) s_leg_left_us = us;
-        else s_leg_right_us = us;
+        if (ch == 0) { s_leg_left_us = us; s_leg_left_enabled = true; }
+        else { s_leg_right_us = us; s_leg_right_enabled = true; }
     }
     xSemaphoreGive(s_mutex);
     cJSON_Delete(root);
@@ -269,10 +277,14 @@ static esp_err_t LegsHandler(httpd_req_t* req) {
     const uint16_t l = static_cast<uint16_t>(left->valueint);
     const uint16_t r = static_cast<uint16_t>(right->valueint);
     esp_err_t err = PcaSetPulse(0, l);
-    if (err == ESP_OK) err = PcaSetPulse(3, r);
     if (err == ESP_OK) {
         s_leg_left_us = l;
-        s_leg_right_us = r;
+        s_leg_left_enabled = true;
+        err = PcaSetPulse(3, r);
+        if (err == ESP_OK) {
+            s_leg_right_us = r;
+            s_leg_right_enabled = true;
+        }
     }
     xSemaphoreGive(s_mutex);
     cJSON_Delete(root);

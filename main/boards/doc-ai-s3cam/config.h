@@ -74,18 +74,20 @@
 #define PCA9685_I2C_FREQUENCY_HZ 100000
 // DOC FIM
 
-// DOC INÍCIO — canais e limites iniciais do projeto
+// DOC INÍCIO — canais e calibração de teste das rodas
 // CH0: SG90 perna esquerda; CH3: SG90 perna direita; faixa inicial 1250–1750 us.
 // CH1: MG90S roda esquerda; CH2: MG90S roda direita; neutro testado em 1705 us.
-// Os valores das rodas são calibrações individuais, não limites universais.
+// CW=1665 us e CCW=1800 us foram confirmados nos testes físicos desta montagem.
+// Os valores são específicos destes motores; recalibrar se forem substituídos.
+// Ao validar mudanças, manter as rodas suspensas e parar diante de esforço ou ruído anormal.
 #define DOC_LEG_SERVO_MIN_US 1250
 #define DOC_LEG_SERVO_MAX_US 1750
 #define DOC_WHEEL_LEFT_CW_US 1665
 #define DOC_WHEEL_LEFT_STOP_US 1705
-#define DOC_WHEEL_LEFT_CCW_US 1750
+#define DOC_WHEEL_LEFT_CCW_US 1800
 #define DOC_WHEEL_RIGHT_CW_US 1665
 #define DOC_WHEEL_RIGHT_STOP_US 1705
-#define DOC_WHEEL_RIGHT_CCW_US 1755
+#define DOC_WHEEL_RIGHT_CCW_US 1800
 // DOC FIM
 
 #endif // DOC_AI_S3CAM_CONFIG_H
