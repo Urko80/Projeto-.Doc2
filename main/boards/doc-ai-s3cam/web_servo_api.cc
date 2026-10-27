@@ -32,6 +32,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
+
+// DOC INÍCIO — símbolos gerados pelo ESP-IDF ao embutir web_control.html
+// O CMake registra o arquivo boards/doc-ai-s3cam/web_control.html como TXT.
+extern const uint8_t _binary_boards_doc_ai_s3cam_web_control_html_start[];
+extern const uint8_t _binary_boards_doc_ai_s3cam_web_control_html_end[];
+// DOC FIM — interface HTML dentro da flash do firmware
 #include <string>
 
 #include <cJSON.h>
@@ -169,6 +176,22 @@ static void SendJson(httpd_req_t* req, const char* json, const char* status = "2
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
     httpd_resp_sendstr(req, json);
 }
+
+// DOC INÍCIO — servir o painel embutido na raiz do endereço IP
+// GET / e GET /index.html devolvem a mesma interface HTML responsiva.
+static esp_err_t WebUiHandler(httpd_req_t* req) {
+    const size_t html_size = static_cast<size_t>(
+        _binary_boards_doc_ai_s3cam_web_control_html_end -
+        _binary_boards_doc_ai_s3cam_web_control_html_start);
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_send(
+        req,
+        reinterpret_cast<const char*>(_binary_boards_doc_ai_s3cam_web_control_html_start),
+        html_size);
+}
+// DOC FIM — servir painel web
 
 static esp_err_t OptionsHandler(httpd_req_t* req) {
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -433,6 +456,11 @@ extern "C" void DocWebServoApiStart(void) {
         ESP_LOGE(TAG, "Falha ao iniciar servidor HTTP: %s", esp_err_to_name(err));
         return;
     }
+
+    // DOC INÍCIO — página inicial para acesso direto pelo celular
+    RegisterUri(s_http, "/", HTTP_GET, WebUiHandler);
+    RegisterUri(s_http, "/index.html", HTTP_GET, WebUiHandler);
+    // DOC FIM — página inicial
 
     RegisterUri(s_http, "/api/status", HTTP_GET, StatusHandler);
     RegisterUri(s_http, "/api/servo", HTTP_POST, ServoHandler);
