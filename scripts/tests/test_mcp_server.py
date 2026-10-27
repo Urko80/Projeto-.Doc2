@@ -69,6 +69,13 @@ class McpServerTest(unittest.TestCase):
                 };
                 inline void vTaskDelay(int) { std::abort(); }
                 #define pdMS_TO_TICKS(value) (value)
+                // DOC INÍCIO — Stub da prioridade usado pela ferramenta MCP de câmera.
+                // No teste de host não existe FreeRTOS; a classe real só ajusta prioridade.
+                class TaskPriorityReset {
+                public:
+                    explicit TaskPriorityReset(int) {}
+                };
+                // DOC FIM — Stub de TaskPriorityReset.
             ''',
             "esp_system.h": r'''
                 #pragma once
