@@ -60,9 +60,9 @@
   <section class="panel" id="connectionNotice">
     <h2>Conectar ao DOC</h2>
     <p class="muted">Digite o endereço IP mostrado pelo roteador para a placa. Abra esta página em um dispositivo na mesma rede Wi-Fi.</p>
-    <div class="field"><label for="deviceUrl">Endereço da API</label><input id="deviceUrl" type="text" inputmode="url" placeholder="http://192.168.1.123" value="http://192.168.1.123"></div>
+    <div class="field"><label for="deviceUrl">Endereço da API</label><input id="deviceUrl" type="text" inputmode="url" placeholder="http://192.168.0.14" value="http://192.168.0.14"></div>
     <div class="actions"><button class="action primary" id="connectDevice">Testar conexão</button></div>
-    <p class="muted">A API ainda não tem autenticação. Use somente em rede confiável. O controle das rodas ficará bloqueado na interface até confirmar o sentido de montagem dos dois motores.</p>
+    <p class="muted">A API ainda não tem autenticação. Use somente em rede confiável. Os comandos das rodas estão habilitados; faça os testes com as rodas suspensas e use PARAR RODAS para interromper o movimento.</p>
   </section>
 
   <!-- DOC INÍCIO — ABA PERNAS: SG90 NOS CANAIS 0 E 3 -->
@@ -112,8 +112,8 @@
   </section>
   <!-- DOC FIM — ABA CALIBRAÇÃO -->
 
-  <div class="status-line" id="statusLine" role="status" aria-live="polite">Pronto — modo de demonstração, sem ligação ao hardware.</div>
-  <p class="muted">DOC INÍCIO — DOC INÍCIO — Ações HTTP comentadas no próprio arquivo index.html. Confirme o recebimento antes de movimentar o robô.</p>
+  <div class="status-line" id="statusLine" role="status" aria-live="polite">Pronto — confirme a conexão com o ESP32-S3 antes de enviar comandos.</div>
+  <p class="muted">Comandos HTTP documentados no próprio arquivo index.html. Confirme a conexão com a placa antes de movimentar o robô.</p>
 </main>
 <script>
   /* DOC INÍCIO — NAVEGAÇÃO, CONEXÃO HTTP E COMANDOS DE PERNAS */
