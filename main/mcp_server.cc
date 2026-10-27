@@ -74,28 +74,30 @@ void McpServer::AddCommonTools() {
     // DOC INÍCIO — Ferramentas da câmera registradas mesmo quando ela está fechada.
     // A placa inicializa a OV3660 sob demanda; não capture um ponteiro nulo no boot.
     if (board.HasCamera()) {
-        AddTool("self.camera.open",
-                "Open the DOC camera and start its live preview. Use this when the user asks "
-                "to open, turn on, or show the camera. Use self.camera.take_photo for visual "
-                "questions about objects or scenes.",
-                PropertyList(),
-                [&board](const PropertyList&) -> ToolResult {
-                    if (board.OpenCamera() == nullptr) {
-                        return std::unexpected("Failed to open camera");
-                    }
-                    return true;
-                });
+        if (board.SupportsCameraLifecycle()) {
+            AddTool("self.camera.open",
+                    "Open the DOC camera and start its live preview. Use this when the user asks "
+                    "to open, turn on, or show the camera. Use self.camera.take_photo for visual "
+                    "questions about objects or scenes.",
+                    PropertyList(),
+                    [&board](const PropertyList&) -> ToolResult {
+                        if (board.OpenCamera() == nullptr) {
+                            return std::unexpected("Failed to open camera");
+                        }
+                        return true;
+                    });
 
-        AddTool("self.camera.close",
-                "Close the DOC camera and stop its live preview when the user asks to close "
-                "or turn off the camera.",
-                PropertyList(),
-                [&board](const PropertyList&) -> ToolResult {
-                    if (!board.CloseCamera()) {
-                        return std::unexpected("Failed to close camera");
-                    }
-                    return true;
-                });
+            AddTool("self.camera.close",
+                    "Close the DOC camera and stop its live preview when the user asks to close "
+                    "or turn off the camera.",
+                    PropertyList(),
+                    [&board](const PropertyList&) -> ToolResult {
+                        if (!board.CloseCamera()) {
+                            return std::unexpected("Failed to close camera");
+                        }
+                        return true;
+                    });
+        }
 
         AddTool("self.camera.take_photo",
                 "Take a photo with the DOC camera and explain what is visible. Use this when "
