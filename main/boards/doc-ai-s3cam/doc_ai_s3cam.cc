@@ -1,10 +1,10 @@
-
 #include "wifi_board.h"
 #include "codecs/no_audio_codec.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
 #include "display/lcd_display.h"
+#include "web_servo_api.h"
 
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>
@@ -19,6 +19,7 @@ class DocAiS3Cam : public WifiBoard {
 private:
     Button boot_button_;
     Display* display_ = nullptr;
+    bool servo_api_started_ = false;
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
@@ -30,6 +31,20 @@ private:
             app.ToggleChatState();
         });
     }
+
+    // DOC INÍCIO — API web inicia somente após a rede estar conectada
+    void HandleNetworkEvent(NetworkEvent event, const std::string& data) {
+        if (event == NetworkEvent::Connected && !servo_api_started_) {
+            ESP_LOGI(TAG, "Wi-Fi conectado; iniciando API web de servos");
+            DocWebServoApiStart();
+            servo_api_started_ = true;
+        } else if (event == NetworkEvent::Disconnected && servo_api_started_) {
+            // Em desconexão, tenta parar os motores e encerra o servidor.
+            DocWebServoApiStop();
+            servo_api_started_ = false;
+        }
+    }
+    // DOC FIM
 
     void InitializeDisplay() {
         spi_bus_config_t bus_config = {};
@@ -91,10 +106,28 @@ private:
     }
 
 public:
+    // DOC INÍCIO — preservar o callback da aplicação e tratar eventos da placa
+    // Application::Initialize() chama este método depois do construtor.
+    // Encadeamos o callback da API web com o callback principal, evitando que
+    // o registro posterior da aplicação substitua o tratamento de rede do DOC.
+    void SetNetworkEventCallback(NetworkEventCallback callback) override {
+        WifiBoard::SetNetworkEventCallback(
+            [this, callback](NetworkEvent event, const std::string& data) {
+                HandleNetworkEvent(event, data);
+                if (callback) {
+                    callback(event, data);
+                }
+            });
+    }
+    // DOC FIM
+
     DocAiS3Cam() : boot_button_(BOOT_BUTTON_GPIO) {
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
+
+        // A Application registra seu callback durante Initialize().
+        // O encadeamento do callback é implementado em SetNetworkEventCallback().
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
@@ -102,6 +135,12 @@ public:
                  AUDIO_I2S_MIC_GPIO_DIN,
                  AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK,
                  AUDIO_I2S_SPK_GPIO_DOUT);
+    }
+
+    ~DocAiS3Cam() override {
+        if (servo_api_started_) {
+            DocWebServoApiStop();
+        }
     }
 
     AudioCodec* GetAudioCodec() override {
