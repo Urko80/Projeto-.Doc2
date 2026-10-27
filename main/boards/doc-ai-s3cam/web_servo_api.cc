@@ -10,7 +10,7 @@
  *
  * Segurança e validação:
  * - Os pulsos são validados no firmware, não apenas na interface.
- * - CH1/CH2 são MG90S contínuos: CW=1665 us, stop=1705 us, CCW=1750/1755 us.
+ * - CH1/CH2 são MG90S contínuos: CW=1665 us, stop=1705 us, CCW=1800 us (valor de teste ainda não validado).
  * - CH0/CH3 são SG90: faixa inicial conservadora validada de 1250 a 1750 us.
  * - Um watchdog para as rodas após 1,5 s sem novo comando de roda.
  * - A API não possui autenticação nesta primeira versão: use apenas em uma
