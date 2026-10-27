@@ -36,8 +36,9 @@
 
 // DOC INÍCIO — símbolos gerados pelo ESP-IDF ao embutir web_control.html
 // O CMake registra o arquivo boards/doc-ai-s3cam/web_control.html como TXT.
-extern const uint8_t _binary_boards_doc_ai_s3cam_web_control_html_start[];
-extern const uint8_t _binary_boards_doc_ai_s3cam_web_control_html_end[];
+// O ESP-IDF nomeia os símbolos pelo nome-base do arquivo embutido.
+extern const uint8_t _binary_web_control_html_start[];
+extern const uint8_t _binary_web_control_html_end[];
 // DOC FIM — interface HTML dentro da flash do firmware
 #include <string>
 
@@ -181,14 +182,14 @@ static void SendJson(httpd_req_t* req, const char* json, const char* status = "2
 // GET / e GET /index.html devolvem a mesma interface HTML responsiva.
 static esp_err_t WebUiHandler(httpd_req_t* req) {
     const size_t html_size = static_cast<size_t>(
-        _binary_boards_doc_ai_s3cam_web_control_html_end -
-        _binary_boards_doc_ai_s3cam_web_control_html_start);
+        _binary_web_control_html_end -
+        _binary_web_control_html_start);
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     return httpd_resp_send(
         req,
-        reinterpret_cast<const char*>(_binary_boards_doc_ai_s3cam_web_control_html_start),
+        reinterpret_cast<const char*>(_binary_web_control_html_start),
         html_size);
 }
 // DOC FIM — servir painel web
