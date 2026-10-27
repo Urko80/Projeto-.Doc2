@@ -77,6 +77,7 @@ public:
     // DOC INÍCIO — API genérica para câmeras inicializadas sob demanda.
     // O comportamento padrão preserva compatibilidade com placas sem câmera.
     virtual bool HasCamera() { return GetCamera() != nullptr; }
+    virtual bool SupportsCameraLifecycle() { return false; }
     virtual Camera* OpenCamera() { return GetCamera(); }
     virtual bool CloseCamera() { return false; }
     virtual void SetCameraVisionEndpoint(const std::string& url, const std::string& token) {
