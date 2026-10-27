@@ -163,7 +163,10 @@ class McpServerTest(unittest.TestCase):
             raise unittest.SkipTest("requires C++23, cJSON and mbedTLS development headers: "
                                     + probe.stderr)
         cls.executable = build / "mcp_test"
-        subprocess.run(
+        # DOC INÍCIO — Exibir o erro real caso a compilação do teste falhe.
+        # capture_output continua evitando poluir a saída em caso de sucesso; em caso de
+        # falha, stdout/stderr são incluídos na exceção para facilitar o diagnóstico no CI.
+        compile_result = subprocess.run(
             compiler + ["-std=c++23", "-fno-exceptions", *cjson_flags,
                         f"-I{build}", f"-I{ROOT / 'main'}",
                         f"-I{ROOT / 'main/boards/common'}",
@@ -171,8 +174,16 @@ class McpServerTest(unittest.TestCase):
                         str(ROOT / "main/mcp_server.cc"),
                         str(ROOT / "main/boards/common/press_to_talk_mcp_tool.cc"),
                         *libs, "-o", str(cls.executable)],
-            check=True, capture_output=True, text=True,
+            capture_output=True, text=True,
         )
+        if compile_result.returncode != 0:
+            raise RuntimeError(
+                "MCP host test compilation failed.\n"
+                f"Compiler stdout:\n{compile_result.stdout}\n"
+                f"Compiler stderr:\n{compile_result.stderr}"
+            )
+        # DOC FIM — Diagnóstico de compilação do teste MCP.
+
 
     def responses(self, requests, custom_sender=True):
         process = subprocess.run(
