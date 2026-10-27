@@ -241,6 +241,10 @@ public:
         return true;
     }
 
+    bool SupportsCameraLifecycle() override {
+        return true;
+    }
+
     Camera* GetCamera() override {
         return camera_;
     }
