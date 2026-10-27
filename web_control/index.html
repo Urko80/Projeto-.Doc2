@@ -90,9 +90,9 @@
     <h2>Controle das rodas</h2><p class="muted">MG90S contínuos · CH1 e CH2 · neutro inicial 1705 µs</p>
     <div class="notice">A API atual aceita apenas sentidos discretos (CW, CCW ou STOP); o controle de velocidade variável ainda não está implementado. Teste com as rodas suspensas.</div>
     <div class="servo">
-      <div class="servo-head"><h3>Velocidade solicitada</h3><output id="speedValue">0%</output></div>
-      <input id="speed" type="range" min="0" max="30" step="5" value="0" aria-label="Velocidade solicitada, limitada inicialmente a 30 por cento">
-      <div class="scale"><span>Parado</span><span>Teste limitado a 30%</span></div>
+      <div class="servo-head"><h3>Velocidade variável</h3><output id="speedValue">Indisponível</output></div>
+      <input id="speed" type="range" min="0" max="30" step="5" value="0" aria-label="Velocidade variável não implementada" disabled>
+      <div class="scale"><span>Indisponível</span><span>Comandos discretos apenas</span></div>
     </div>
     <div class="field"><label for="direction">Comando das rodas</label><select id="direction" style="width:100%;background:#091521;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px"><option value="forward">Ambas CW (horário)</option><option value="reverse">Ambas CCW (anti-horário — teste 1800 µs)</option><option value="left">Giro: esquerda CCW / direita CW</option><option value="right">Giro: esquerda CW / direita CCW</option></select></div>
     <div class="actions"><button class="action primary" id="sendWheels">Enviar comando das rodas</button><button class="action stop" id="stopWheels">PARAR RODAS</button></div>
@@ -103,8 +103,8 @@
   <section class="panel tab-panel hidden" id="tab-calibration">
     <h2>Registro de calibração</h2><p class="muted">Referência local; valores não são gravados no ESP32 nesta versão.</p>
     <div class="grid2">
-      <div class="servo"><h3>MG90S · CH1</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (experimental)</strong></p></div>
-      <div class="servo"><h3>MG90S · CH2</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (experimental)</strong></p></div>
+      <div class="servo"><h3>MG90S · CH1</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (testado nesta montagem)</strong></p></div>
+      <div class="servo"><h3>MG90S · CH2</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (testado nesta montagem)</strong></p></div>
       <div class="servo"><h3>SG90 · CH0</h3><p>Centro de teste: <strong>1500 µs</strong></p><p>Faixa inicial da API: <strong>1250–1750 µs</strong></p><p class="muted">Faixa limitada conservadoramente; confirmar no conjunto montado.</p></div>
       <div class="servo"><h3>SG90 · CH3</h3><p>Centro testado: <strong>1500 µs</strong></p><p>Faixa inicial da API: <strong>1250–1750 µs</strong></p><p class="muted">Movimento suficiente no teste individual; limites finais dependem da mecânica montada.</p></div>
     </div>
@@ -150,9 +150,10 @@
     const output = document.getElementById(outputId);
     input.addEventListener('input', () => output.value = input.value + ' µs');
   });
-  document.getElementById('speed').addEventListener('input', event => {
-    document.getElementById('speedValue').value = event.target.value + '%';
-  });
+  // DOC INÍCIO — velocidade variável ainda não implementada no firmware.
+  // O controle fica desativado para não sugerir que altera a velocidade física.
+  document.getElementById('speedValue').value = 'Indisponível';
+  // DOC FIM
 
   // Testa a conectividade consultando o endpoint de status.
   document.getElementById('connectDevice').addEventListener('click', async () => {
@@ -222,8 +223,6 @@
 
   // A parada envia um comando real; se não houver resposta, o status informa a falha.
   document.getElementById('stopWheels').addEventListener('click', async () => {
-    document.getElementById('speed').value = 0;
-    document.getElementById('speed').dispatchEvent(new Event('input'));
     try {
       await apiRequest('/api/stop', 'POST', {});
       statusLine.textContent = 'API confirmou a parada das duas rodas.';
