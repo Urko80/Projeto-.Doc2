@@ -106,16 +106,28 @@ private:
     }
 
 public:
+    // DOC INÍCIO — preservar o callback da aplicação e tratar eventos da placa
+    // Application::Initialize() chama este método depois do construtor.
+    // Encadeamos o callback da API web com o callback principal, evitando que
+    // o registro posterior da aplicação substitua o tratamento de rede do DOC.
+    void SetNetworkEventCallback(NetworkEventCallback callback) override {
+        WifiBoard::SetNetworkEventCallback(
+            [this, callback](NetworkEvent event, const std::string& data) {
+                HandleNetworkEvent(event, data);
+                if (callback) {
+                    callback(event, data);
+                }
+            });
+    }
+    // DOC FIM
+
     DocAiS3Cam() : boot_button_(BOOT_BUTTON_GPIO) {
         ESP_LOGI(TAG, "DOC AI S3CAM board startup");
         InitializeButtons();
         InitializeDisplay();
 
-        // Registrar callback antes que StartNetwork() seja chamado pelo app.
-        SetNetworkEventCallback(
-            [this](NetworkEvent event, const std::string& data) {
-                HandleNetworkEvent(event, data);
-            });
+        // A Application registra seu callback durante Initialize().
+        // O encadeamento do callback é implementado em SetNetworkEventCallback().
 
         ESP_LOGI(TAG,
                  "I2S mic BCLK=%d WS=%d DIN=%d; speaker BCLK=%d WS=%d DOUT=%d",
