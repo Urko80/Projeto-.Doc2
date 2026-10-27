@@ -91,6 +91,7 @@ class McpServerTest(unittest.TestCase):
                 #include <cstdint>
                 #include <cstdlib>
                 #include <string>
+                #include <expected>
                 struct AudioCodec { void SetOutputVolume(int) { std::abort(); } };
                 struct Backlight { void SetBrightness(uint8_t, bool) { std::abort(); } };
                 struct Camera {
@@ -106,6 +107,14 @@ class McpServerTest(unittest.TestCase):
                     AudioCodec* GetAudioCodec() { std::abort(); }
                     Backlight* GetBacklight() { return nullptr; }
                     Camera* GetCamera() { return nullptr; }
+                    bool HasCamera() { return false; }
+                    bool SupportsCameraLifecycle() { return false; }
+                    Camera* OpenCamera() { return nullptr; }
+                    bool CloseCamera() { return false; }
+                    void SetCameraVisionEndpoint(const std::string&, const std::string&) {}
+                    std::expected<std::string, std::string> CaptureAndExplain(const std::string&) {
+                        return std::unexpected("Camera unavailable in host test");
+                    }
                 };
             ''',
             "display.h": "",
