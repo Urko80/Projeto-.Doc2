@@ -88,13 +88,13 @@
   <!-- DOC INÍCIO — ABA RODAS: MG90S CONTÍNUOS NOS CANAIS 1 E 2 -->
   <section class="panel tab-panel hidden" id="tab-wheels">
     <h2>Controle das rodas</h2><p class="muted">MG90S contínuos · CH1 e CH2 · neutro inicial 1705 µs</p>
-    <div class="notice">A porcentagem é uma solicitação relativa ao neutro calibrado; a relação entre pulso e velocidade será ajustada em testes individuais.</div>
+    <div class="notice">A API atual aceita apenas sentidos discretos (CW, CCW ou STOP); o controle de velocidade variável ainda não está implementado. Teste com as rodas suspensas.</div>
     <div class="servo">
       <div class="servo-head"><h3>Velocidade solicitada</h3><output id="speedValue">0%</output></div>
       <input id="speed" type="range" min="0" max="30" step="5" value="0" aria-label="Velocidade solicitada, limitada inicialmente a 30 por cento">
       <div class="scale"><span>Parado</span><span>Teste limitado a 30%</span></div>
     </div>
-    <div class="field"><label for="direction">Direção solicitada</label><select id="direction" style="width:100%;background:#091521;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px"><option value="forward">Frente</option><option value="reverse">Ré</option><option value="left">Girar à esquerda</option><option value="right">Girar à direita</option></select></div>
+    <div class="field"><label for="direction">Comando das rodas</label><select id="direction" style="width:100%;background:#091521;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px"><option value="forward">Ambas CW (horário)</option><option value="reverse">Ambas CCW (anti-horário — teste 1800 µs)</option><option value="left">Giro: esquerda CCW / direita CW</option><option value="right">Giro: esquerda CW / direita CCW</option></select></div>
     <div class="actions"><button class="action primary" id="sendWheels">Enviar comando das rodas</button><button class="action stop" id="stopWheels">PARAR RODAS</button></div>
   </section>
   <!-- DOC FIM — ABA RODAS -->
@@ -103,8 +103,8 @@
   <section class="panel tab-panel hidden" id="tab-calibration">
     <h2>Registro de calibração</h2><p class="muted">Referência local; valores não são gravados no ESP32 nesta versão.</p>
     <div class="grid2">
-      <div class="servo"><h3>MG90S · CH1</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1750 µs</strong></p></div>
-      <div class="servo"><h3>MG90S · CH2</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1755 µs</strong></p></div>
+      <div class="servo"><h3>MG90S · CH1</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (experimental)</strong></p></div>
+      <div class="servo"><h3>MG90S · CH2</h3><p>Horário: <strong>1665 µs</strong></p><p>Neutro: <strong>1705 µs</strong></p><p>Anti-horário: <strong>1800 µs (experimental)</strong></p></div>
       <div class="servo"><h3>SG90 · CH0</h3><p>Centro de teste: <strong>1500 µs</strong></p><p>Faixa inicial da API: <strong>1250–1750 µs</strong></p><p class="muted">Faixa limitada conservadoramente; confirmar no conjunto montado.</p></div>
       <div class="servo"><h3>SG90 · CH3</h3><p>Centro testado: <strong>1500 µs</strong></p><p>Faixa inicial da API: <strong>1250–1750 µs</strong></p><p class="muted">Movimento suficiente no teste individual; limites finais dependem da mecânica montada.</p></div>
     </div>
@@ -200,11 +200,25 @@
     }
   }));
 
-  // O sentido físico de montagem das rodas ainda precisa ser confirmado.
-  // Não enviar comandos de movimento até verificar cada roda com o robô suspenso.
-  document.getElementById('sendWheels').addEventListener('click', () => {
-    statusLine.textContent = 'Movimento bloqueado na interface até confirmar o sentido de cada roda em teste suspenso.';
+  // DOC INÍCIO — enviar comandos discretos aceitos por POST /api/wheels
+  // CW usa 1665 µs; CCW usa o valor experimental 1800 µs; STOP usa 1705 µs.
+  // A API não recebe velocidade variável, por isso o slider não altera os pulsos.
+  document.getElementById('sendWheels').addEventListener('click', async () => {
+    const commands = {
+      forward: { left: 'cw', right: 'cw' },
+      reverse: { left: 'ccw', right: 'ccw' },
+      left: { left: 'ccw', right: 'cw' },
+      right: { left: 'cw', right: 'ccw' }
+    };
+    const direction = document.getElementById('direction').value;
+    try {
+      await apiRequest('/api/wheels', 'POST', commands[direction]);
+      statusLine.textContent = 'Comando enviado e confirmado pela API: esquerda=' + commands[direction].left + '; direita=' + commands[direction].right + '.';
+    } catch (error) {
+      statusLine.textContent = 'Comando das rodas não confirmado: ' + error.message;
+    }
   });
+  // DOC FIM — envio de comandos das rodas
 
   // A parada envia um comando real; se não houver resposta, o status informa a falha.
   document.getElementById('stopWheels').addEventListener('click', async () => {
