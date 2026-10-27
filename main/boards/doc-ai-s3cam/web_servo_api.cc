@@ -474,7 +474,7 @@ extern "C" void DocWebServoApiStart(void) {
     RegisterUri(s_http, "/api/stop", HTTP_OPTIONS, OptionsHandler);
 
     s_started = true;
-    ESP_LOGI(TAG, "API pronta em http://<IP-DO-DOC>/api/status");
+    ESP_LOGI(TAG, "Painel web: http://<IP-DO-DOC>/ | API: /api/status");
 }
 
 extern "C" void DocWebServoApiStop(void) {
