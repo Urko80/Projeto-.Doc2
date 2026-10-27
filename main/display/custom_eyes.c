@@ -44,7 +44,7 @@ static const char *TAG = "CustomEyes";
 #define EYE_DISTANCE                52
 
 /* DOC — Valor negativo sobe os olhos; positivo desce os olhos. */
-#define EYE_CENTER_Y_OFFSET         (-5)
+#define EYE_CENTER_Y_OFFSET         (-10)
 
 /* DOC — Dimensões iniciais dos olhos, em pixels. */
 #define EYE_WIDTH_BASE              36
@@ -424,9 +424,10 @@ static void update_eye_visual(eye_t *eye, int center_x, int center_y)
         blink_scale = clampf_local(blink_scale, 0.08f, 1.0f);
     }
 
-    /* DOC — A abertura afeta a altura, não a largura. */
-    float width = eye->width;
-    float height = eye->height * eye->open * blink_scale;
+    /* DOC — Reduz o tamanho renderizado para recuperar a escala funcional anterior. */
+    const float EYE_RENDER_SCALE = 0.80f;
+    float width = eye->width * EYE_RENDER_SCALE;
+    float height = eye->height * eye->open * blink_scale * EYE_RENDER_SCALE;
 
     int draw_w = (int)(width + 0.5f);
     int draw_h = (int)(height + 0.5f);
@@ -567,7 +568,7 @@ static void anim_timer_cb(lv_timer_t *timer)
         lerp(right_eye.offset_y, right_eye.target_offset_y, SHAPE_SPEED);
 
     /* DOC — Calcula os centros para a tela vertical 128x160. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    int center_y = (SCREEN_H / 5) + EYE_CENTER_Y_OFFSET;
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
@@ -612,7 +613,7 @@ void CustomEyes_Init(lv_obj_t *parent)
     apply_expression_targets();
 
     /* DOC — Posiciona os olhos antes do primeiro ciclo do timer. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    int center_y = (SCREEN_H / 5) + EYE_CENTER_Y_OFFSET;
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
@@ -684,7 +685,9 @@ void CustomEyes_SetExpression(const char *expression)
     /* DOC — Mapeamento dos nomes recebidos para os presets visuais. */
     if (strcmp(normalized, "idle") == 0 ||
         strcmp(normalized, "neutral") == 0 ||
-        strcmp(normalized, "normal") == 0) {
+        strcmp(normalized, "normal") == 0 ||
+        strcmp(normalized, "robot_2") == 0 ||
+        strcmp(normalized, "robot-2") == 0) {
 
         current_state = EYES_STATE_IDLE;
         current_expression = DOC_EXPR_NEUTRAL;
@@ -710,7 +713,8 @@ void CustomEyes_SetExpression(const char *expression)
     } else if (strcmp(normalized, "happy") == 0 ||
                strcmp(normalized, "excited") == 0 ||
                strcmp(normalized, "love") == 0 ||
-               strcmp(normalized, "glee") == 0) {
+               strcmp(normalized, "glee") == 0 ||
+               strcmp(normalized, "cool") == 0) {
 
         current_expression = DOC_EXPR_HAPPY;
 
