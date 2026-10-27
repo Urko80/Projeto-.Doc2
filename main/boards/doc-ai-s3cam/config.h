@@ -77,9 +77,9 @@
 // DOC INÍCIO — canais e calibração de teste das rodas
 // CH0: SG90 perna esquerda; CH3: SG90 perna direita; faixa inicial 1250–1750 us.
 // CH1: MG90S roda esquerda; CH2: MG90S roda direita; neutro testado em 1705 us.
-// CW=1665 us funciona nos testes já realizados.
-// CCW=1800 us é um NOVO VALOR DE TESTE, ainda não validado fisicamente.
-// Testar com as rodas suspensas; parar se houver esforço ou ruído anormal.
+// CW=1665 us e CCW=1800 us foram confirmados nos testes físicos desta montagem.
+// Os valores são específicos destes motores; recalibrar se forem substituídos.
+// Ao validar mudanças, manter as rodas suspensas e parar diante de esforço ou ruído anormal.
 #define DOC_LEG_SERVO_MIN_US 1250
 #define DOC_LEG_SERVO_MAX_US 1750
 #define DOC_WHEEL_LEFT_CW_US 1665
