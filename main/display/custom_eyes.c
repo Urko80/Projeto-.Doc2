@@ -773,7 +773,6 @@ void CustomEyes_SetExpression(const char *expression)
     ESP_LOGI(TAG, "Expressão visual: %s", normalized);
 }
 
-/* DOC — Solicita uma piscada manual. */
 /* DOC INÍCIO — Alternar a posição dos olhos conforme o estado da câmera. */
 void CustomEyes_SetCameraMode(bool enabled)
 {
@@ -782,6 +781,7 @@ void CustomEyes_SetCameraMode(bool enabled)
 }
 /* DOC FIM — Modo de posição dos olhos para a câmera. */
 
+/* DOC — Solicita uma piscada manual. */
 void CustomEyes_BlinkNow(void)
 {
     if (!is_blinking) {
