@@ -40,6 +40,9 @@ static const char *TAG = "CustomEyes";
 #define SCREEN_W                    128
 #define SCREEN_H                    160
 
+/* DOC — Altura da caixa superior reservada aos olhos com a câmera aberta. */
+#define CAMERA_INFO_HEIGHT           32
+
 /* DOC — Distância horizontal entre os centros dos olhos. */
 #define EYE_DISTANCE                52
 
@@ -129,6 +132,9 @@ static eye_t right_eye;
 
 static lv_timer_t *anim_timer = NULL;
 static lv_obj_t *parent_ref = NULL;
+
+/* DOC — Controla se os olhos ocupam a faixa superior ou o centro da tela. */
+static bool camera_mode_active = false;
 
 static eyes_state_t current_state = EYES_STATE_IDLE;
 static doc_expression_t current_expression = DOC_EXPR_NEUTRAL;
@@ -568,7 +574,9 @@ static void anim_timer_cb(lv_timer_t *timer)
         lerp(right_eye.offset_y, right_eye.target_offset_y, SHAPE_SPEED);
 
     /* DOC — Calcula os centros para a tela vertical 128x160. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    /* DOC — Câmera aberta: centro da faixa y=0..31; fechada: centro y=80. */
+    int center_y = (camera_mode_active ? (CAMERA_INFO_HEIGHT / 2) : (SCREEN_H / 2))
+                 + EYE_CENTER_Y_OFFSET;
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
@@ -613,7 +621,9 @@ void CustomEyes_Init(lv_obj_t *parent)
     apply_expression_targets();
 
     /* DOC — Posiciona os olhos antes do primeiro ciclo do timer. */
-    int center_y = (SCREEN_H / 2) + EYE_CENTER_Y_OFFSET;
+    /* DOC — Câmera aberta: centro da faixa y=0..31; fechada: centro y=80. */
+    int center_y = (camera_mode_active ? (CAMERA_INFO_HEIGHT / 2) : (SCREEN_H / 2))
+                 + EYE_CENTER_Y_OFFSET;
 
     int left_cx =
         (SCREEN_W / 2) - (EYE_DISTANCE / 2);
@@ -764,6 +774,14 @@ void CustomEyes_SetExpression(const char *expression)
 }
 
 /* DOC — Solicita uma piscada manual. */
+/* DOC INÍCIO — Alternar a posição dos olhos conforme o estado da câmera. */
+void CustomEyes_SetCameraMode(bool enabled)
+{
+    camera_mode_active = enabled;
+    /* O timer reposiciona os olhos em até 33 ms, sem recriar objetos LVGL. */
+}
+/* DOC FIM — Modo de posição dos olhos para a câmera. */
+
 void CustomEyes_BlinkNow(void)
 {
     if (!is_blinking) {
