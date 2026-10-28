@@ -396,6 +396,27 @@ bool LcdDisplay::Lock(int timeout_ms) { return lvgl_port_lock(timeout_ms); }
 
 void LcdDisplay::Unlock() { lvgl_port_unlock(); }
 
+/* DOC INÍCIO — Layout dedicado à prévia da câmera do DOC. */
+void LcdDisplay::SetCameraPreviewMode(bool enabled) {
+    DisplayLockGuard lock(this);
+    camera_preview_mode_ = enabled;
+
+    if (preview_image_ == nullptr) {
+        return;  // SetupUI ainda não criou o objeto da prévia.
+    }
+
+    if (enabled) {
+        /* DOC — Reserva y=0..31 para os olhos e y=32..159 para a imagem. */
+        lv_obj_set_size(preview_image_, width_, height_ - 32);
+        lv_obj_align(preview_image_, LV_ALIGN_TOP_MID, 0, 32);
+    } else {
+        /* DOC — Ao fechar a câmera, restaura o espaço normal da prévia. */
+        lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
+        lv_obj_align(preview_image_, LV_ALIGN_CENTER, 0, 0);
+    }
+}
+/* DOC FIM — Layout dedicado à prévia da câmera do DOC. */
+
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
 void LcdDisplay::SetupUI() {
     // Prevent duplicate calls - if already called, return early
@@ -1132,8 +1153,19 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     auto img_dsc = preview_image_cached_->image_dsc();
     lv_image_set_src(preview_image_, img_dsc);
     if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
-        // zoom factor 0.5
-        lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        if (camera_preview_mode_) {
+            /* DOC — Escala para preencher 128x128; o excesso horizontal é recortado pela tela. */
+            const lv_coord_t view_width = width_;
+            const lv_coord_t view_height = height_ - 32;
+            const lv_coord_t zoom_w = (view_width * 256) / img_dsc->header.w;
+            const lv_coord_t zoom_h = (view_height * 256) / img_dsc->header.h;
+            lv_image_set_scale(preview_image_, zoom_w > zoom_h ? zoom_w : zoom_h);
+            lv_obj_set_size(preview_image_, view_width, view_height);
+            lv_obj_align(preview_image_, LV_ALIGN_TOP_MID, 0, 32);
+        } else {
+            // DOC — Mantém o dimensionamento original fora do modo de câmera.
+            lv_image_set_scale(preview_image_, 128 * width_ / img_dsc->header.w);
+        }
     }
 
     // Hide emoji_box_
