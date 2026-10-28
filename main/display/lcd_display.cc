@@ -409,6 +409,21 @@ void LcdDisplay::SetCameraPreviewMode(bool enabled) {
         /* DOC — Reserva y=0..31 para os olhos e y=32..159 para a imagem. */
         lv_obj_set_size(preview_image_, width_, height_ - 32);
         lv_obj_align(preview_image_, LV_ALIGN_TOP_MID, 0, 32);
+
+        /* DOC — Se já houver um quadro, atualiza a escala sem esperar o próximo frame. */
+        if (preview_image_cached_ != nullptr) {
+            const auto img_dsc = preview_image_cached_->image_dsc();
+            if (img_dsc->header.w > 0 && img_dsc->header.h > 0) {
+                const lv_coord_t zoom_w = (width_ * 256) / img_dsc->header.w;
+                const lv_coord_t zoom_h = ((height_ - 32) * 256) / img_dsc->header.h;
+                const lv_coord_t zoom = zoom_w > zoom_h ? zoom_w : zoom_h;
+                lv_image_set_scale(preview_image_, zoom);
+                lv_obj_set_size(preview_image_,
+                    (img_dsc->header.w * zoom + 128) / 256,
+                    (img_dsc->header.h * zoom + 128) / 256);
+                lv_obj_align(preview_image_, LV_ALIGN_TOP_MID, 0, 32);
+            }
+        }
     } else {
         /* DOC — Ao fechar a câmera, restaura o espaço normal da prévia. */
         lv_obj_set_size(preview_image_, width_ / 2, height_ / 2);
@@ -1159,8 +1174,12 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
             const lv_coord_t view_height = height_ - 32;
             const lv_coord_t zoom_w = (view_width * 256) / img_dsc->header.w;
             const lv_coord_t zoom_h = (view_height * 256) / img_dsc->header.h;
-            lv_image_set_scale(preview_image_, zoom_w > zoom_h ? zoom_w : zoom_h);
-            lv_obj_set_size(preview_image_, view_width, view_height);
+            const lv_coord_t zoom = zoom_w > zoom_h ? zoom_w : zoom_h;
+            lv_image_set_scale(preview_image_, zoom);
+            /* DOC — Mantém o tamanho renderizado e centraliza o recorte horizontal. */
+            lv_obj_set_size(preview_image_,
+                (img_dsc->header.w * zoom + 128) / 256,
+                (img_dsc->header.h * zoom + 128) / 256);
             lv_obj_align(preview_image_, LV_ALIGN_TOP_MID, 0, 32);
         } else {
             // DOC — Mantém o dimensionamento original fora do modo de câmera.
