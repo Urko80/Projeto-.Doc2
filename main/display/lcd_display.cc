@@ -1237,6 +1237,30 @@ if (custom_eyes_initialized_ && emotion != nullptr) {
 
 
 
+    // DOC INÍCIO — Impedir que emojis antigos substituam os olhos DOC.
+    // As expressões já foram encaminhadas ao motor de olhos acima.
+    // Escondemos a interface legada e encerramos antes do código de emojis/GIFs.
+    if (custom_eyes_initialized_) {
+        DisplayLockGuard lock(this);
+
+        if (gif_controller_) {
+            gif_controller_->Stop();
+            gif_controller_.reset();
+        }
+
+        if (emoji_box_ != nullptr) {
+            lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_label_ != nullptr) {
+            lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_image_ != nullptr) {
+            lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
+    // DOC FIM — A tela usa os olhos animados, sem emoji legado.
+
     if (emoji_image_ == nullptr) {
         if (setup_ui_called_) {
             ESP_LOGW(TAG,
