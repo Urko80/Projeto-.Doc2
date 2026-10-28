@@ -4,6 +4,7 @@
 #include "button.h"
 #include "config.h"
 #include "display/lcd_display.h"
+#include "display/custom_eyes.h"
 #include "web_servo_api.h"
 
 #include "esp32_camera.h"
@@ -260,6 +261,12 @@ public:
             }
         }
         camera_->SetExplainUrl(camera_vision_url_, camera_vision_token_);
+        // DOC INÍCIO — Com a câmera aberta, olhos na faixa y=0..31 e imagem em y=32..159.
+        if (display_ != nullptr) {
+            static_cast<LcdDisplay*>(display_)->SetCameraPreviewMode(true);
+        }
+        CustomEyes_SetCameraMode(true);
+        // DOC FIM — Layout da câmera.
         StartCameraPreviewTask();
         return camera_;
     }
@@ -270,7 +277,10 @@ public:
         camera_ = nullptr;
         if (display_ != nullptr) {
             display_->SetPreviewImage(nullptr);
+            // DOC — Restaura a prévia e os olhos ao centro após fechar a câmera.
+            static_cast<LcdDisplay*>(display_)->SetCameraPreviewMode(false);
         }
+        CustomEyes_SetCameraMode(false);
         ESP_LOGI(TAG, "OV3660 camera closed");
         return true;
     }
